@@ -1,3 +1,2 @@
 # NTC
-## Yuanhe test
-haha
+Repository for LING575, team NTC
