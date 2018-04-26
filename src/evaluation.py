@@ -28,10 +28,7 @@ def evaluate(result_string, gold_string, eval_method='wer'):
         eval_result = []
 
         for i in range(len(data[0])):
-            # print(len(data[0][i].split()))
-            # print(len(data[1][i].split()))
-            word_error_rate = wer.calculate_wer(data[0][i], data[1][i])
-            # print(word_error_rate)
+            word_error_rate = wer.calculate_wer(data[0][i].split(), data[1][i].split())
             eval_result.append(word_error_rate)
 
     return eval_result
