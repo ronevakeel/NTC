@@ -76,8 +76,8 @@ def get_pairs(ocr_file=raw_text_file, gold_standard=gold_text_file):
 # Test script
 
 if __name__ == "__main__":
-    raw_content = read_file('OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt')
-    gold_content = read_file('')
+    raw_content = read_file(raw_text_file)
+    gold_content = read_file(gold_text_file)
     r_content = clean_empty_line(raw_content)
     g_content = clean_empty_line(gold_content)
     # print(content)
