@@ -10,7 +10,9 @@ import operator
 import re
 
 data_path = '../data/'
+output_path = "../output/"
 raw_text_file = "OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
+cleaned_text_file = "cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
 gold_text_file = "gold_standard/Edit_ Some Further Accounts of the Nile 1912-1913.txt"
 
 def read_file(filename):
@@ -59,6 +61,19 @@ def lines2string(lines):
     return content_string
 
 
+def write_file(lines, filename=cleaned_text_file):
+    """
+    Write a list of strings into a file
+    :type lines: str
+    :param lines: a list of string to be written into file
+    :type filename: str
+    :param filename: the name of output file, the default name is ""cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
+    """
+    output_file = open(output_path + filename, 'w')
+    for line in lines:
+        output_file.write(line + "\n")
+
+
 def get_pairs(ocr_file=raw_text_file, gold_standard=gold_text_file):
     """
     :type ocr_file: str
@@ -88,6 +103,7 @@ if __name__ == "__main__":
         print(tokens)
         print("")
     '''
+    write_file(r_content)
     r_clean_string = lines2string(r_content)
     g_clean_string = lines2string(g_content)
     print("hello")
