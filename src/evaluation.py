@@ -21,15 +21,18 @@ def evaluate(result_string, gold_string, eval_method='wer'):
     """
 
     if eval_method == 'wer':
-        hyp_list = result_string.split()
-        ref_list = gold_string.split()
-        # print(word_list1, word_list2)
-        data = split_by_year(result_string, gold_string)
-        eval_result = []
-
-        for i in range(len(data[0])):
-            word_error_rate = wer.calculate_wer(data[0][i].split(), data[1][i].split())
-            eval_result.append(word_error_rate)
+        # hyp_list = result_string.split()
+        # ref_list = gold_string.split()
+        re_list, gold_list = split_by_year(result_string, gold_string)
+        total_errors = 0
+        total_len = 0
+        for i in range(len(re_list)):
+            re_seq = re_list[i].split()
+            gold_seq = gold_list[i].split()
+            word_error_rate = wer.calculate_wer(re_seq, gold_seq)
+            total_errors += len(gold_seq) * word_error_rate
+            total_len += len(gold_seq)
+        eval_result = total_errors / total_len
 
     return eval_result
 
@@ -58,10 +61,8 @@ def split_by_year(result_text, gold_text):
     """
     Split the result string and gold string by year, so that the time complicity of evaluation will significantly reduce.
     :type result_text: str
-    :param result_text:
     :type gold_text: str
-    :param gold_text:
-    :return: a tup whose first element is the split list of result and the second element is the split list of gold standard
+    :return: split list of result and the split list of gold standard
     """
     result_text_list = []
     gold_text_list = []
@@ -85,7 +86,7 @@ def split_by_year(result_text, gold_text):
         result_text_list.append(result_list[i-1] + result_list[i])
         gold_text_list.append(gold_list[i-1] + gold_list[i])
         i += 2
-    return (result_text_list, gold_text_list)
+    return result_text_list, gold_text_list
 
 """
 ** NOT COMPLETED PART **
