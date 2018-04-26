@@ -7,6 +7,7 @@ Provides evaluation methods for OCR correction result.
 """
 import nltk
 import src.wer as wer
+import re
 
 
 def evaluate(result_string, gold_string, eval_method='wer'):
@@ -16,13 +17,22 @@ def evaluate(result_string, gold_string, eval_method='wer'):
     :type result_string: str
     :type gold_string: str
     :type eval_method: str
-    :rtype: float
+    :rtype: float list
     """
+
     if eval_method == 'wer':
         hyp_list = result_string.split()
         ref_list = gold_string.split()
         # print(word_list1, word_list2)
-        eval_result = wer.calculate_wer(ref_list, hyp_list)
+        data = split_by_year(result_string, gold_string)
+        eval_result = []
+
+        for i in range(len(data[0])):
+            # print(len(data[0][i].split()))
+            # print(len(data[1][i].split()))
+            word_error_rate = wer.calculate_wer(data[0][i], data[1][i])
+            # print(word_error_rate)
+            eval_result.append(word_error_rate)
 
     return eval_result
 
@@ -47,6 +57,38 @@ def evaluate(result_string, gold_string, eval_method='wer'):
 #     return eval_result
 
 
+def split_by_year(result_text, gold_text):
+    """
+    Split the result string and gold string by year, so that the time complicity of evaluation will significantly reduce.
+    :type result_text: str
+    :param result_text:
+    :type gold_text: str
+    :param gold_text:
+    :return: a tup whose first element is the split list of result and the second element is the split list of gold standard
+    """
+    result_text_list = []
+    gold_text_list = []
+    result_list = re.split("(1912)", result_text)
+    gold_list = re.split("(1912)", gold_text)
+    i = 1
+    while i < len(result_list):
+        result_text_list.append(result_list[i-1] + result_list[i])
+        gold_text_list.append(gold_list[i-1] + gold_list[i])
+        i += 2
+    re_text = result_list[len(result_list) - 1]
+    go_text = gold_list[len(gold_list) - 1]
+    result_list = re.split("(191[3;)])", re_text)
+    gold_list = re.split("(1913)", go_text)
+    if len(gold_list) > 35:
+        gold_list[32] += gold_list[33] + gold_list[34]
+        del gold_list[33]
+        del gold_list[33]
+    i = 1
+    while i < len(result_list):
+        result_text_list.append(result_list[i-1] + result_list[i])
+        gold_text_list.append(gold_list[i-1] + gold_list[i])
+        i += 2
+    return (result_text_list, gold_text_list)
 
 """
 ** NOT COMPLETED PART **
