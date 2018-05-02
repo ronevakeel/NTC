@@ -102,6 +102,3 @@ ENV/
 
 .idea/*
 idea/*
-
-# local data
-data/local/

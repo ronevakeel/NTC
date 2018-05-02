@@ -8,7 +8,13 @@ model_path = "../output/"
 WHITE_SPACE = 0
 TOKENIZER = 1
 
+
 def readfile(file_name):
+    '''
+    Get a list of lines from the file.
+    :param file_name: path of input file
+    :return: a list of lines in this file
+    '''
     content = []
     lines = open(file_name, 'r').readlines()
     for line in lines:
@@ -24,6 +30,12 @@ def readfile(file_name):
 
 
 def writefile(unigram, bigram, path=model_path):
+    '''
+    Write the count of all unigrams and bigrams into different file
+    :param unigram: a dictionary of count of unigram
+    :param bigram: a dictionary of count of bigram
+    :param path: the path to store the two output file
+    '''
     uni_file = open(os.path.join(path, "unigram"), 'w')
     bi_file = open(os.path.join(path, "bigram"), 'w')
 
@@ -34,6 +46,11 @@ def writefile(unigram, bigram, path=model_path):
 
 
 def get_files(dir, file_list):
+    '''
+    From the data directory, get a list of all readable files' path
+    :param dir: the directory of data
+    :param file_list: a list to store the path of files
+    '''
     files = os.listdir(dir)
     for file in files:
         if operator.eq(file, ".DS_Store"):
@@ -45,7 +62,14 @@ def get_files(dir, file_list):
             get_files(path, file_list)
 
 
-def count_appearance(content, ugram_dict, bgram_dict, split_strategy=WHITE_SPACE):
+def count_appearance(content, ugram_dict, bgram_dict, split_strategy=TOKENIZER):
+    '''
+    Given a list of lines, count the appearance of unigram and bigrams in a specific tokenizing strategy.
+    :param content: list of lines
+    :param ugram_dict: the dictionary that stores the count of all unigrams
+    :param bgram_dict: the dictionary that stores the count of all bigrams
+    :param split_strategy: the way to split words, WHITE_SPACE or NLTK tokenizer
+    '''
     for line in content:
         items = []
         if split_strategy == WHITE_SPACE:
@@ -72,6 +96,11 @@ def count_appearance(content, ugram_dict, bgram_dict, split_strategy=WHITE_SPACE
 
 
 def ngrammodel(data_path, output_path=model_path):
+    '''
+    Given a data directory and output directory, generate files that store the count of unigrams and bigrams
+    :param data_path: the directory of training data
+    :param output_path: the directory to store counting data
+    '''
     all_files = []
     unigramdict = {}
     bigramdict = {}
@@ -82,8 +111,48 @@ def ngrammodel(data_path, output_path=model_path):
         except Exception:
             print(file)
             continue
-        count_appearance(contentlist, unigramdict, bigramdict)
+        count_appearance(contentlist, unigramdict, bigramdict, TOKENIZER)
     writefile(unigramdict, bigramdict, output_path)
+
+
+def wf_levenshtein(string_1, string_2):
+    """
+    Calculates the Levenshtein distance between two strings.
+
+    This version uses the Wagner-Fischer algorithm.
+
+    Usage::
+
+        >>> wf_levenshtein('kitten', 'sitting')
+        3
+        >>> wf_levenshtein('kitten', 'kitten')
+        0
+        >>> wf_levenshtein('', '')
+        0
+
+    """
+    len_1 = len(string_1) + 1
+    len_2 = len(string_2) + 1
+
+    d = [0] * (len_1 * len_2)
+
+    for i in range(len_1):
+        d[i] = i
+    for j in range(len_2):
+        d[j * len_1] = j
+
+    for j in range(1, len_2):
+        for i in range(1, len_1):
+            if string_1[i - 1] == string_2[j - 1]:
+                d[i + j * len_1] = d[i - 1 + (j - 1) * len_1]
+            else:
+                d[i + j * len_1] = min(
+                   d[i - 1 + j * len_1] + 1,        # deletion
+                   d[i + (j - 1) * len_1] + 1,      # insertion
+                   d[i - 1 + (j - 1) * len_1] + 1,  # substitution
+                )
+
+    return d[-1]
 
 
 if __name__ == "__main__":
