@@ -17,15 +17,17 @@ if __name__ == "__main__":
     result = []
     for line in data:
         result.append(model.process(line))
-    # print(result)
-    # result = reader.lines2string(result)
+
+    reader.write_file(result, output_path+'corrected_text1')
+    result = reader.lines2string(result)
+    data = reader.lines2string(data)
     gold = reader.read_file(data_path+gold_text_file)
     gold = reader.clean_empty_line(gold)
     gold = reader.lines2string(gold)
+
     print('finished')
     # re_list, gold_list = evaluation.split_by_year(result, gold)
-    reader.write_file(result, output_path + 'corrected_text')
-    # result, gold = reader.get_pairs(data_path+raw_text_file, data_path+gold_text_file)
+    # # result, gold = reader.get_pairs(data_path+raw_text_file, data_path+gold_text_file)
     # print(re_list.__len__(), gold_list.__len__())
     # print(evaluation.evaluate(result, gold))
 

@@ -4,11 +4,35 @@
 import os
 import re
 import nltk
+import string
+
+def nth_repl(s, sub, repl, nth):
+    """
+    Replace n-th substring in s to repl. Return replaced s.
+    :param s: str
+    :param sub: str
+    :param repl: str
+    :param nth: int
+    :return: str
+    """
+    find = s.find(sub)
+    # if find is not p1 we have found at least one match for the substring
+    i = find != -1
+    # loop util we find the nth or we find no match
+    while find != -1 and i != nth:
+        # find + 1 means we start at the last match start index + 1
+        find = s.find(sub, find + 1)
+        i += 1
+    # if i  is equal to nth we found nth matches so replace
+    if i == nth:
+        return s[:find]+repl+s[find + len(sub):]
+    return s
 
 class NoisyTextCorrection:
     def __init__(self, rbm):
         self.rbm = rbm
-
+        self.chars = string.ascii_letters
+        self.puncs = string.punctuation
     def apply_all_rules(self, text):
         # apply rules on noisy text
 
@@ -17,6 +41,27 @@ class NoisyTextCorrection:
         for rule_name in ruleset_list:
             self._apply_rule(text, rule_name)
         return text
+
+    def remove_garbage_strings(self, text):
+        word_seq = text.split(' ')
+        for word in word_seq:
+            if self._is_garbage(word):
+                text = text.replace(word, '')
+        return text
+
+    def _is_garbage(self, word):
+        count = 0
+        if len(word) <= 0:
+            return False
+        if len(word) > 40:
+            return True
+        if len(word) > 2:
+            for char in word[1:-1]:
+                if char in self.puncs:
+                    count += 1
+        if count/len(word) > 0.5:
+            return True
+        return False
 
     def _apply_rule(self, text, rule_type='CorrectionRules.txt'):
         """
@@ -48,29 +93,57 @@ class NoisyTextCorrection:
         return text
 
     def apply_char_rule(self, text):
+        """
+        Apply character rules on word level in CharRules.txt
+        :param text: raw text
+        :return: corrected text
+        """
+        numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
         # apply rules on noisy text
         word_seq = nltk.word_tokenize(text)
         for word in word_seq:
             word = re.sub('^\W+$', '', word)
             corrected_word = word
             continue_loop = 1
-            if word not in self.rbm.vocabulary:
+            if word not in self.rbm.vocabulary and word.lower() not in self.rbm.vocabulary and word != '':
                 # Only process wrong word
+                max_count = 0  # only apply most frequent rule
                 for key, sub_list in self.rbm.char_rules.items():
-                    # Check every rule
-                    if key in word:
-                        for candidate in sub_list:
-                            if word.replace(key, candidate) in self.rbm.vocabulary:
-                                corrected_word = word.replace(key, candidate)
-                                continue_loop = 0
-                                break
-                    if continue_loop == 0:
-                        # word is changed
-                        text = text.replace(word, corrected_word)
-                        # print(word, corrected_word)
-                        if word == '1912' or word == '1913' or word == '191;' or word == '191)':
-                            print(word, corrected_word)
-                        break
+                    if key in self.chars:
+                        # for all regular letters
+                        n_subs = len(re.findall(key, word))  # find how many keys found in word
+                    elif key in word:
+                        # for other puncs and numbers, only substitute once
+                        n_subs = 1
+                    else:
+                        n_subs = 0
+                    if n_subs > 0:
+                        for candidate, count in sub_list:
+                            # print(key, candidate, count)
+                            for i in range(n_subs):
+                                replaced = nth_repl(word, key, candidate, i+1)
+                                if replaced in self.rbm.vocabulary:
+                                    if key in numbers and candidate in numbers:
+                                        # Do not correct numbers
+                                        continue
+                                    else:
+                                        if int(count) > max_count:
+                                            # corrected_word = word.replace(key, candidate)
+                                            print(key, candidate, corrected_word)
+                                            corrected_word = replaced
+                                            continue_loop = 0
+                                            max_count = int(count)
+                # Checked all rules, best substitution found
+                if continue_loop == 0:
+                # the word is changed
+                    p1 = ' ' + word + ' '
+                    p2 = ' ' + word + '$'
+                    p3 = '^' + word + ' '
+                    print(corrected_word)
+                    text = text.replace(p1, ' '+corrected_word+' ')
+                    text = re.sub(p2, ' '+corrected_word, text)
+                    text = re.sub(p3, corrected_word+' ', text)
+
 
         return text
 
@@ -78,6 +151,7 @@ class NoisyTextCorrection:
         # main method to process noisy text
 
         # Apply rules first
+        text = self.remove_garbage_strings(text)
         text = self.apply_char_rule(text)
 
         # Statistical approach
@@ -130,9 +204,9 @@ class RuleBasedModel:
                         elements = rule.split(';')
                         if int(elements[2]) > 10:
                             if elements[1] in ruleset:
-                                ruleset[elements[1]] = ruleset[elements[1]] + [elements[0]]
+                                ruleset[elements[1]] = ruleset[elements[1]] + [(elements[0], elements[2])]
                             else:
-                                ruleset[elements[1]] = [elements[0]]  # Store rule using dictionary
+                                ruleset[elements[1]] = [(elements[0], elements[2])]  # Store rule using dictionary
                     self.char_rules = ruleset
                 else:
                     # Read vocabulary
@@ -204,6 +278,7 @@ class RuleBasedModel:
 if __name__ == '__main__':
     rbm = RuleBasedModel('ruleset')
     rbm.read_char_rule_and_vocab()
-    for key in rbm.vocabulary:
-        print(key)
+    ntc = NoisyTextCorrection(rbm)
+    cr = ntc.apply_char_rule('Darling Gopher -The day we got to Naples Wns simply henvenly. I posted you a letter from there the minute I reached the Hotel.')
+
 
