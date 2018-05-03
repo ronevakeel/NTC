@@ -2,6 +2,7 @@ import operator
 import re
 import os
 import nltk
+import math
 
 WHITE_SPACE = 0
 TOKENIZER = 1
@@ -166,7 +167,18 @@ def wf_levenshtein(string_1, string_2):
     return d[-1]
 
 
-def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN, delta=1):
+def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN, delta):
+    '''
+    Get the correction of a given line of string
+    :param unigram: a dictionary of unigrams in the training corpus
+    :param bigram: a dictionary of bigrams in the training corpus
+    :param input_line: the line of string waiting to be corrected
+    :param total_tokens: the sive of the training corpus
+    :param split_strategy: the way to split tokens
+    :param topN: the number of candidates for each word waiting to be corrected
+    :param delta: the value of delta used to smooth the probability
+    :return: a corrected line of string with highest generation probability
+    '''
     words = splitstr(input_line, split_strategy)
     line_candidate = []
     for word in words:
@@ -183,18 +195,57 @@ def bestoutput(unigram, bigram, line_candidates, total_tokens, delta):
     begin_candidates = line_candidates[0]
     from_state = []
     for cand in begin_candidates:
-        from_state.append(("", get_unigram_prob(cand, unigram, delta, total_tokens)))
+        from_state.append(([], math.log(get_unigram_prob(cand, unigram, delta, total_tokens))))
     for i in range(1, sen_length):
         prev_candidates = line_candidates[i-1]
         curr_candidates = line_candidates[i]
-        for j in len(curr_candidates):
+        to_state = []
+        for j in range(len(curr_candidates)):
             curr_cand = curr_candidates[j]
-            for k in len(prev_candidates):
+            prob_list = []
+            for k in range(len(prev_candidates)):
                 prev_cand = prev_candidates[k]
                 bg = (prev_cand, curr_cand)
+                bi_prob = get_bigram_prob(bg, unigram, bigram, delta)
+                path = from_state[k][0].copy()
+                path.append(k)
+                prob_list.append((path, from_state[k][1] + math.log(bi_prob)))
+            best_index = get_best_candidate(prob_list)
+            to_state.append(prob_list[best_index])
+        from_state = to_state.copy()
+    best_index = get_best_candidate(from_state)
+    from_state[best_index][0].append(best_index)
+    best_list = from_state[best_index][0]
+    best_line = ""
+    for i in range(len(best_list)):
+        best_line += line_candidates[i][best_list[i]] + " "
+    return best_line.strip()
+
+
+def get_best_candidate(prob_list):
+    '''
+    Get the candidates with highest probability
+    :param prob_list: a list of cadidates to be selected
+    :return: the index of the best element
+    '''
+    best_prob = -1
+    best_index = 0
+    for i in range(len(prob_list)):
+        prob_list[i][1] > best_prob
+        best_prob = prob_list[i][1]
+        best_index = i
+    return best_index
 
 
 def get_unigram_prob(unigram, unigram_dict, delta, total_takens):
+    '''
+    Calculate the probability of unigram, add delta smoothing strategy is applied
+    :param unigram: the unigram to be calculated
+    :param unigram_dict: the dictionary of all unigrams
+    :param delta: value of delta to be used
+    :param total_takens: the size of the training corpus
+    :return: the probability of the unigram
+    '''
     voc_size = len(unigram_dict)
     cw = delta
     if unigram in unigram_dict:
@@ -204,16 +255,33 @@ def get_unigram_prob(unigram, unigram_dict, delta, total_takens):
 
 
 def get_bigram_prob(bigram, unigram_dict, bigram_dict, delta):
+    '''
+    Calculate the probability of bigram, add delta smoothing strategy is applied
+    :param unigram: the bigram to be calculated
+    :param unigram_dict: the dictionary of all bigrams
+    :param delta: value of delta to be used
+    :param total_takens: the size of the training corpus
+    :return: the probability of the bigram
+    '''
     first = bigram[0]
-    second = bigram[1]
     voc_size = len(unigram_dict)
     cw = delta
     if bigram in bigram_dict:
         cw += bigram_dict[bigram]
-    total = delta *
+    total = delta * voc_size
+    if first in unigram_dict:
+        total += unigram_dict[first]
+    return float(cw) / total
 
 
 def get_candidate(err_word, unigram_dic, topN):
+    '''
+    Find N candidates of a error word with the lowest cost
+    :param err_word: the word to be corrected
+    :param unigram_dic: dictionary of unigrams
+    :param topN: the number of candidate to be selected
+    :return: a list of candidate
+    '''
     candidate = []
     if topN > len(unigram_dic):
         return list(unigram_dic.keys())
@@ -226,9 +294,19 @@ def get_candidate(err_word, unigram_dic, topN):
                 biggest_index, biggest_cost = find_biggest(candidate)
                 if cost < biggest_cost:
                     candidate[biggest_index] = (word, cost)
-    return candidate
+    final_cand = []
+    for item in candidate:
+        token = item[0]
+        final_cand.append(token)
+    return final_cand
+
 
 def find_biggest(list):
+    '''
+    Find the item with highest cost
+    :param list: a list of items to be search
+    :return: the index of the selected item
+    '''
     index = 0
     cost = -1
     for i in range(0, len(list)):
@@ -240,12 +318,15 @@ def find_biggest(list):
 
 
 if __name__ == "__main__":
+
     data_path = "../data/local/"
     model_path = "../output/"
     unigram, bigram, total_tokens = ngrammodel(data_path, model_path)
 
     text_path = "../data/OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
     train_file = open(text_path, 'r')
+    new_line = []
     for line in train_file.readlines():
-        modify_line(unigram, bigram, line, total_tokens, TOKENIZER, 10, 1)
-
+        if re.match("\\s+", line):
+            continue
+        new_line.append(modify_line(unigram, bigram, line, total_tokens, TOKENIZER, 10, 1))
