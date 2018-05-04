@@ -24,6 +24,7 @@ def evaluate(result_string, gold_string, eval_method='wer'):
         # hyp_list = result_string.split()
         # ref_list = gold_string.split()
         re_list, gold_list = split_by_year(result_string, gold_string)
+
         total_errors = 0
         total_len = 0
         for i in range(len(re_list)):

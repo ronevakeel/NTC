@@ -9,11 +9,7 @@
 import operator
 import re
 
-data_path = '../data/'
-output_path = "../output/"
-raw_text_file = "OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
-cleaned_text_file = "cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
-gold_text_file = "gold_standard/Edit_ Some Further Accounts of the Nile 1912-1913.txt"
+
 
 def read_file(filename):
     """
@@ -23,7 +19,7 @@ def read_file(filename):
     :return: list of strings, one string per line
     """
     import codecs
-    with codecs.open(data_path + filename, "r", encoding='utf-8', errors='ignore') as input_file:
+    with codecs.open(filename, "r", encoding='utf-8', errors='ignore') as input_file:
         contents = input_file.read()
         contents = contents.split('\n')
     return contents
@@ -61,7 +57,7 @@ def lines2string(lines):
     return content_string
 
 
-def write_file(lines, filename=cleaned_text_file):
+def write_file(lines, filename):
     """
     Write a list of strings into a file
     :type lines: str
@@ -69,12 +65,12 @@ def write_file(lines, filename=cleaned_text_file):
     :type filename: str
     :param filename: the name of output file, the default name is ""cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
     """
-    output_file = open(output_path + filename, 'w')
+    output_file = open(filename, 'w')
     for line in lines:
         output_file.write(line + "\n")
 
 
-def get_pairs(ocr_file=raw_text_file, gold_standard=gold_text_file):
+def get_pairs(ocr_file, gold_standard):
     """
     :type ocr_file: str
     :param ocr_file: path of raw oct text file, the default is "OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
@@ -89,8 +85,12 @@ def get_pairs(ocr_file=raw_text_file, gold_standard=gold_text_file):
     return (lines2string(r_content), lines2string(g_content))
 
 # Test script
-
 if __name__ == "__main__":
+    data_path = '../data/'
+    output_path = "../output/"
+    raw_text_file = "OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
+    cleaned_text_file = "cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
+    gold_text_file = "gold_standard/Edit_ Some Further Accounts of the Nile 1912-1913.txt"
     raw_content = read_file(raw_text_file)
     gold_content = read_file(gold_text_file)
     r_content = clean_empty_line(raw_content)
