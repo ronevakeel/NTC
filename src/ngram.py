@@ -231,9 +231,9 @@ def get_best_candidate(prob_list):
     best_prob = -1
     best_index = 0
     for i in range(len(prob_list)):
-        prob_list[i][1] > best_prob
-        best_prob = prob_list[i][1]
-        best_index = i
+        if prob_list[i][1] > best_prob:
+            best_prob = prob_list[i][1]
+            best_index = i
     return best_index
 
 
