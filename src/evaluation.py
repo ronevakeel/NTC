@@ -113,7 +113,21 @@ def word_match_rate(result_string, gold_string, scope=10):
 
 # Test script
 if __name__ == '__main__':
+    '''
     hyp = 'This machine can wreck a nice beach'
     # ref = 'This great machine can recognize speech'
     ref = 'This machine can wreck a good beach'
     print(evaluate(hyp, ref, 'wer'))
+    '''
+    raw_ocr_file = open("../data/OCR_text/newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt", 'r')
+    gold_standard = open("../data/gold_standard/Edit_ Some Further Accounts of the Nile 1912-1913.txt", 'r')
+
+    raw_content = raw_ocr_file.read()
+    gold_content = gold_standard.read()
+
+    raw_parts, gold_parts = split_by_year(raw_content, gold_content)
+    for i in range(len(raw_parts)):
+        rw = open("../data/OCR_text/NMB_" + str(i) + ".txt", 'w')
+        gw = open("../data/gold_standard/ESF_" + str(i) + ".txt", 'w')
+        rw.write(raw_parts[i])
+        gw.write(gold_parts[i])
