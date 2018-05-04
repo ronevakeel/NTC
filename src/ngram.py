@@ -257,10 +257,10 @@ def get_unigram_prob(unigram, unigram_dict, delta, total_takens):
 def get_bigram_prob(bigram, unigram_dict, bigram_dict, delta):
     '''
     Calculate the probability of bigram, add delta smoothing strategy is applied
-    :param unigram: the bigram to be calculated
-    :param unigram_dict: the dictionary of all bigrams
+    :param bigram: the bigram to be calculated
+    :param unigram_dict: the dictionary of all unigrams
+    :param bigram_dict: the dictionary of all bigrams
     :param delta: value of delta to be used
-    :param total_takens: the size of the training corpus
     :return: the probability of the bigram
     '''
     first = bigram[0]
@@ -275,13 +275,13 @@ def get_bigram_prob(bigram, unigram_dict, bigram_dict, delta):
 
 
 def get_candidate(err_word, unigram_dic, topN):
-    '''
+    """
     Find N candidates of a error word with the lowest cost
     :param err_word: the word to be corrected
     :param unigram_dic: dictionary of unigrams
     :param topN: the number of candidate to be selected
     :return: a list of candidate
-    '''
+    """
     candidate = []
     if topN > len(unigram_dic):
         return list(unigram_dic.keys())
@@ -301,16 +301,16 @@ def get_candidate(err_word, unigram_dic, topN):
     return final_cand
 
 
-def find_biggest(list):
+def find_biggest(items):
     '''
     Find the item with highest cost
-    :param list: a list of items to be search
+    :param items: a list of items to be search
     :return: the index of the selected item
     '''
     index = 0
     cost = -1
-    for i in range(0, len(list)):
-        curr_cost = list[i][1]
+    for i in range(0, len(items)):
+        curr_cost = items[i][1]
         if curr_cost > cost:
             cost = curr_cost
             index = i
