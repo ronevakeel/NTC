@@ -54,3 +54,7 @@ if __name__ == "__main__":
     # print(re_list.__len__(), gold_list.__len__())
     # print(evaluation.evaluate(result, gold))
 
+    gold, raw = reader.get_pairs(data_path + gold_text_file, data_path + raw_text_file)
+    gold, corr = reader.get_pairs(data_path + gold_text_file, output_path + "corrected_text2")
+    print("raw: " + str(evaluation.evaluate(gold, raw)))
+    print("corrected: " + str(evaluation.evaluate(gold, corr)))

@@ -147,7 +147,7 @@ def wf_levenshtein(string_1, string_2):
     len_1 = len(string_1) + 1
     len_2 = len(string_2) + 1
 
-    d = [0] * (len_1 * len_2)
+    d = [0.0] * (len_1 * len_2)
 
     for i in range(len_1):
         d[i] = i
@@ -162,7 +162,7 @@ def wf_levenshtein(string_1, string_2):
                 d[i + j * len_1] = min(
                    d[i - 1 + j * len_1] + 1,        # deletion
                    d[i + (j - 1) * len_1] + 1,      # insertion
-                   d[i - 1 + (j - 1) * len_1] + 1,  # substitution
+                   d[i - 1 + (j - 1) * len_1] + 0.8,  # substitution
                 )
 
     return d[-1]
