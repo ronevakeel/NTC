@@ -61,7 +61,7 @@ def get_files(dir, file_list):
             get_files(path, file_list)
 
 
-def count_appearance(content, ugram_dict, bgram_dict, total_token, split_strategy=TOKENIZER):
+def count_appearance(content, ugram_dict, bgram_dict, split_strategy=TOKENIZER):
     '''
     Given a list of lines, count the appearance of unigram and bigrams in a specific tokenizing strategy.
     :param content: list of lines
@@ -77,7 +77,6 @@ def count_appearance(content, ugram_dict, bgram_dict, total_token, split_strateg
                 ugram_dict[item] += 1
             else:
                 ugram_dict[item] = 1
-            total_token += 1
 
         for i in range(1, len(items)):
             ''' Count bigrams '''
@@ -122,7 +121,7 @@ def ngrammodel(data_path, output_path):
         except Exception:
             print(file)
             continue
-        count_appearance(contentlist, unigramdict, bigramdict, total_tokens, TOKENIZER)
+        count_appearance(contentlist, unigramdict, bigramdict, TOKENIZER)
     writefile(unigramdict, bigramdict, output_path)
     total_tokens = sum(unigramdict.values())
     return unigramdict, bigramdict, total_tokens
