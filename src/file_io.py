@@ -60,7 +60,7 @@ def lines2string(lines):
 def write_file(lines, filename):
     """
     Write a list of strings into a file
-    :type lines: str
+    :type lines: list[str]
     :param lines: a list of string to be written into file
     :type filename: str
     :param filename: the name of output file, the default name is ""cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"

@@ -124,6 +124,7 @@ def ngrammodel(data_path, output_path):
             continue
         count_appearance(contentlist, unigramdict, bigramdict, total_tokens, TOKENIZER)
     writefile(unigramdict, bigramdict, output_path)
+    total_tokens = sum(unigramdict.values())
     return unigramdict, bigramdict, total_tokens
 
 

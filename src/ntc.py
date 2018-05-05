@@ -29,10 +29,12 @@ def nth_repl(s, sub, repl, nth):
     return s
 
 class NoisyTextCorrection:
+
     def __init__(self, rbm):
         self.rbm = rbm
         self.chars = string.ascii_letters
         self.puncs = string.punctuation
+
     def apply_all_rules(self, text):
         # apply rules on noisy text
 
@@ -129,7 +131,7 @@ class NoisyTextCorrection:
                                     else:
                                         if int(count) > max_count:
                                             # corrected_word = word.replace(key, candidate)
-                                            print(key, candidate, corrected_word)
+                                            # print(key, candidate, corrected_word)
                                             corrected_word = replaced
                                             continue_loop = 0
                                             max_count = int(count)
@@ -139,7 +141,7 @@ class NoisyTextCorrection:
                     p1 = ' ' + word + ' '
                     p2 = ' ' + word + '$'
                     p3 = '^' + word + ' '
-                    print(corrected_word)
+                    # print(corrected_word)
                     text = text.replace(p1, ' '+corrected_word+' ')
                     text = re.sub(p2, ' '+corrected_word, text)
                     text = re.sub(p3, corrected_word+' ', text)
@@ -276,9 +278,9 @@ class RuleBasedModel:
 
 # Test script
 if __name__ == '__main__':
-    rbm = RuleBasedModel('ruleset')
-    rbm.read_char_rule_and_vocab()
-    ntc = NoisyTextCorrection(rbm)
+    rule_model = RuleBasedModel('ruleset')
+    rule_model.read_char_rule_and_vocab()
+    ntc = NoisyTextCorrection(rule_model)
     cr = ntc.apply_char_rule('Darling Gopher -The day we got to Naples Wns simply henvenly. I posted you a letter from there the minute I reached the Hotel.')
 
 
