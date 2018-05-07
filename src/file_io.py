@@ -46,7 +46,7 @@ def clean_empty_line(raw_lines):
 def lines2string(lines):
     """
     Connect all strings in lines by a space
-    :type lines: str
+    :type lines: list[str]
     :param lines: A list of string to be connected
     :return: A string
     """
