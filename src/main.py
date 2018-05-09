@@ -4,6 +4,7 @@ import src.ntc as ntc
 import src.ngram as ng
 import re
 import os
+import nltk
 
 if __name__ == "__main__":
     if 'output' in os.listdir('.'):
@@ -38,21 +39,25 @@ if __name__ == "__main__":
             print(new_line)
 
     # Write result
-    reader.write_file(result, output_path+'corrected_text1')
-    reader.write_file(new_result, output_path+'corrected_text2')
+    # reader.write_file(result, output_path+'corrected_text1')
+    # reader.write_file(new_result, output_path+'corrected_text2')
 
     # Evaluation
-    # result = reader.lines2string(result)
-    # data = reader.lines2string(data)
-    # gold = reader.read_file(data_path+gold_text_file)
-    # gold = reader.clean_empty_line(gold)
-    # gold = reader.lines2string(gold)
+    result = reader.lines2string(result)
+    new_result = reader.lines2string(new_result)
+    data = reader.lines2string(data)
+    gold = reader.read_file(data_path+gold_text_file)
+    gold = reader.clean_empty_line(gold)
+    gold = reader.lines2string(gold)
     #
     # print('finished')
     # re_list, gold_list = evaluation.split_by_year(result, gold)
     # # result, gold = reader.get_pairs(data_path+raw_text_file, data_path+gold_text_file)
     # print(re_list.__len__(), gold_list.__len__())
-    # print(evaluation.evaluate(result, gold))
+
+    print('WER in raw text:', evaluation.evaluate(data, gold))
+    print('WER after rule-based system:', evaluation.evaluate(result, gold))
+    print('WER after rule-based and statistical system', evaluation.evaluate(new_result, gold))
 
     gold, raw = reader.get_pairs(data_path + gold_text_file, data_path + raw_text_file)
     gold, corr = reader.get_pairs(data_path + gold_text_file, output_path + "corrected_text2")

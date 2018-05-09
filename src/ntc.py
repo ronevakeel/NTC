@@ -137,7 +137,7 @@ class NoisyTextCorrection:
                                             max_count = int(count)
                 # Checked all rules, best substitution found
                 if continue_loop == 0:
-                # the word is changed
+                    # the word is changed
                     p1 = ' ' + word + ' '
                     p2 = ' ' + word + '$'
                     p3 = '^' + word + ' '
@@ -145,7 +145,6 @@ class NoisyTextCorrection:
                     text = text.replace(p1, ' '+corrected_word+' ')
                     text = re.sub(p2, ' '+corrected_word, text)
                     text = re.sub(p3, corrected_word+' ', text)
-
 
         return text
 

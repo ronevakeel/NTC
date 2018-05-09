@@ -10,30 +10,17 @@ import src.wer as wer
 import re
 
 
-def evaluate(result_string, gold_string, eval_method='wer'):
+def evaluate(result_string, gold_string):
     """
     Evaluate system's performance using word error rate or rouge measurement.
     Use 'wer' and 'rouge' to specify which measurement you're going to use.
     :type result_string: str
     :type gold_string: str
-    :type eval_method: str
     :rtype: float list
     """
-
-    if eval_method == 'wer':
-        # hyp_list = result_string.split()
-        # ref_list = gold_string.split()
-        re_list, gold_list = split_by_year(result_string, gold_string)
-
-        total_errors = 0
-        total_len = 0
-        for i in range(len(re_list)):
-            re_seq = re_list[i].split()
-            gold_seq = gold_list[i].split()
-            word_error_rate = wer.calculate_wer(re_seq, gold_seq)
-            total_errors += len(gold_seq) * word_error_rate
-            total_len += len(gold_seq)
-        eval_result = total_errors / total_len
+    re_seq = nltk.word_tokenize(result_string)
+    gold_seq = nltk.word_tokenize(gold_string)
+    eval_result = wer.calculate_wer(gold_seq, re_seq)
 
     return eval_result
 

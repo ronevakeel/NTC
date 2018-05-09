@@ -119,7 +119,7 @@ def ngrammodel(data_path, output_path):
         try:
             contentlist = readfile(file)
         except Exception:
-            print(file)
+            # print(file)
             continue
         count_appearance(contentlist, unigramdict, bigramdict, TOKENIZER)
     writefile(unigramdict, bigramdict, output_path)
