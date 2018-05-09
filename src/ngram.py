@@ -73,6 +73,7 @@ def count_appearance(content, ugram_dict, bgram_dict, split_strategy=TOKENIZER):
         items = splitstr(line, split_strategy)
         for item in items:
             ''' Count unigrams '''
+            item = item.lower()
             if item in ugram_dict:
                 ugram_dict[item] += 1
             else:
@@ -80,7 +81,7 @@ def count_appearance(content, ugram_dict, bgram_dict, split_strategy=TOKENIZER):
 
         for i in range(1, len(items)):
             ''' Count bigrams '''
-            bg = (items[i-1], items[i])
+            bg = (items[i-1].lower(), items[i].lower())
             if bg in bgram_dict:
                 bgram_dict[bg] += 1
             else:
@@ -113,7 +114,6 @@ def ngrammodel(data_path, output_path):
     all_files = []
     unigramdict = {}
     bigramdict = {}
-    total_tokens = 0
     get_files(data_path, all_files)
     for file in all_files:
         try:
@@ -167,7 +167,7 @@ def wf_levenshtein(string_1, string_2):
     return d[-1]
 
 
-def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN, delta):
+def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN, delta, threshold):
     '''
     Get the correction of a given line of string
     :param unigram: a dictionary of unigrams in the training corpus
@@ -177,20 +177,32 @@ def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN,
     :param split_strategy: the way to split tokens
     :param topN: the number of candidates for each word waiting to be corrected
     :param delta: the value of delta used to smooth the probability
+    :param threshold: the threshold for the cost of candidate selection
     :return: a corrected line of string with highest generation probability
     '''
     words = splitstr(input_line, split_strategy)
     line_candidate = []
     for word in words:
         if word in unigram:
-            line_candidate.append([word])
+            line_candidate.append([(word, 1)])
         else:
-            candidates = get_candidate(word, unigram, topN)
+            candidates = get_candidate(word, unigram, topN, threshold)
             line_candidate.append(candidates)
-    return bestoutput(unigram, bigram, line_candidate, total_tokens, delta)
+    corrected_words = bestoutput(unigram, bigram, line_candidate, total_tokens, delta)
+
+    return replace_words(input_line, words, corrected_words)
 
 
 def bestoutput(unigram, bigram, line_candidates, total_tokens, delta):
+    """
+    Use Viterbi algorithm to get the best output.
+    :param unigram:
+    :param bigram:
+    :param line_candidates:
+    :param total_tokens:
+    :param delta:
+    :return:
+    """
     sen_length = len(line_candidates)
     begin_candidates = line_candidates[0]
     from_state = []
@@ -206,7 +218,7 @@ def bestoutput(unigram, bigram, line_candidates, total_tokens, delta):
             for k in range(len(prev_candidates)):
                 prev_cand = prev_candidates[k]
                 bg = (prev_cand, curr_cand)
-                bi_prob = get_bigram_prob(bg, unigram, bigram, delta)
+                bi_prob = get_bigram_prob(bg, unigram, bigram, delta, total_tokens)
                 path = from_state[k][0].copy()
                 path.append(k)
                 prob_list.append((path, from_state[k][1] + math.log(bi_prob)))
@@ -216,10 +228,35 @@ def bestoutput(unigram, bigram, line_candidates, total_tokens, delta):
     best_index = get_best_candidate(from_state)
     from_state[best_index][0].append(best_index)
     best_list = from_state[best_index][0]
-    best_line = ""
+    best_candidate = []
     for i in range(len(best_list)):
-        best_line += line_candidates[i][best_list[i]] + " "
-    return best_line.strip()
+        candidate = line_candidates[i]
+        ind = best_list[i]
+        best_candidate.append(candidate[ind])
+    return best_candidate
+
+
+def replace_words(line, word_list, new_word_cand_list):
+    new_line = ""
+    current_index = 0
+    for i in range(len(word_list)):
+        old_word = word_list[i]
+        new_word = new_word_cand_list[i][0]
+        start_index = line.find(old_word, current_index)
+        if start_index == -1:
+            start_index = current_index
+            curr_char = line[start_index]
+            while curr_char == ' ':
+                start_index += 1
+                curr_char = line[start_index]
+        old_index = current_index
+        current_index = start_index + len(old_word)
+        string_seq = line[old_index:current_index]
+        string_seq = string_seq.replace(old_word, new_word)
+        new_line += string_seq
+        if current_index >= len(line):
+            break
+    return new_line
 
 
 def get_best_candidate(prob_list):
@@ -228,7 +265,7 @@ def get_best_candidate(prob_list):
     :param prob_list: a list of cadidates to be selected
     :return: the index of the best element
     '''
-    best_prob = -1
+    best_prob = float('-Inf')
     best_index = 0
     for i in range(len(prob_list)):
         if prob_list[i][1] > best_prob:
@@ -237,68 +274,120 @@ def get_best_candidate(prob_list):
     return best_index
 
 
-def get_unigram_prob(unigram, unigram_dict, delta, total_takens):
+def get_unigram_prob(unigram_cand, unigram_dict, delta, total_takens):
     '''
     Calculate the probability of unigram, add delta smoothing strategy is applied
-    :param unigram: the unigram to be calculated
+    :param unigram_cand: the unigram candidata to be calculated
     :param unigram_dict: the dictionary of all unigrams
     :param delta: value of delta to be used
     :param total_takens: the size of the training corpus
     :return: the probability of the unigram
     '''
+    unigram = unigram_cand[0]
+    cost = unigram_cand[1]
     voc_size = len(unigram_dict)
     cw = delta
-    if unigram in unigram_dict:
-        cw += unigram_dict[unigram]
+    unigram_low = unigram.lower()
+    if unigram_low in unigram_dict:
+        cw += unigram_dict[unigram_low]
     total = delta * voc_size + total_takens
-    return float(cw) / total
+    return float(cw) / (total * cost)
 
 
-def get_bigram_prob(bigram, unigram_dict, bigram_dict, delta):
+def get_bigram_prob(bigram_cand, unigram_dict, bigram_dict, delta, total_tokens):
     '''
     Calculate the probability of bigram, add delta smoothing strategy is applied
-    :param bigram: the bigram to be calculated
+    :param bigram_cand: the bigram candidate to be calculated
     :param unigram_dict: the dictionary of all unigrams
     :param bigram_dict: the dictionary of all bigrams
     :param delta: value of delta to be used
     :return: the probability of the bigram
     '''
-    first = bigram[0]
+    bigram = (bigram_cand[0][0], bigram_cand[1][0])
+    bigram_cost = (bigram_cand[0][1], bigram_cand[1][1])
+    first = bigram[0].lower()
+    second = bigram[1].lower()
     voc_size = len(unigram_dict)
     cw = delta
-    if bigram in bigram_dict:
-        cw += bigram_dict[bigram]
+    bigram_low = (first, second)
+    has_bigram = False
+    if bigram_low in bigram_dict:
+        cw += bigram_dict[bigram_low]
+        has_bigram = True
+    elif second in unigram_dict:
+        cw += unigram_dict[second]
     total = delta * voc_size
-    if first in unigram_dict:
+    if has_bigram and first in unigram_dict:
         total += unigram_dict[first]
-    return float(cw) / total
+    else:
+        total += total_tokens
+    return float(cw) / (total * bigram_cost[1])
 
 
-def get_candidate(err_word, unigram_dic, topN):
+def get_candidate(err_word, unigram_dic, topN, threshold):
     """
     Find N candidates of a error word with the lowest cost
     :param err_word: the word to be corrected
     :param unigram_dic: dictionary of unigrams
     :param topN: the number of candidate to be selected
-    :return: a list of candidate
+    :return: a list of candidate and its cost
     """
     candidate = []
-    if topN > len(unigram_dic):
-        return list(unigram_dic.keys())
+    err_word_low = err_word.lower()
+    if topN > (len(unigram_dic) + 1):
+        candidate = list(unigram_dic.keys())
+        candidate.append(err_word)
+        return candidate
     else:
         for word in unigram_dic.keys():
-            cost = wf_levenshtein(err_word, word)
+            cost = wf_levenshtein(err_word_low, word)
+            if err_word[0].isupper():
+                word = word.capitalize()
+            if cost > threshold:
+                continue
+            cost += 1
             if len(candidate) < topN:
                 candidate.append((word, cost))
             else:
                 biggest_index, biggest_cost = find_biggest(candidate)
                 if cost < biggest_cost:
                     candidate[biggest_index] = (word, cost)
+    """
     final_cand = []
+    final_cand.append(err_word)
     for item in candidate:
         token = item[0]
         final_cand.append(token)
     return final_cand
+    """
+    candidate = clean_candidate(candidate)
+    candidate.append((err_word, 1))
+    return candidate
+
+
+def clean_candidate(candidate):
+    ind, lowest_cost = find_lowest(candidate)
+    new_candidate = []
+    for item in candidate:
+        if item[1] == lowest_cost:
+            new_candidate.append(item)
+    return new_candidate
+
+
+def find_lowest(items):
+    '''
+    Find the item with lowest cost
+    :param items: a list of items to be search
+    :return: the index of the selected item
+    '''
+    index = 0
+    cost = float("Inf")
+    for i in range(0, len(items)):
+        curr_cost = items[i][1]
+        if curr_cost < cost:
+            cost = curr_cost
+            index = i
+    return index, cost
 
 
 def find_biggest(items):

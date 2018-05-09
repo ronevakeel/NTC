@@ -34,13 +34,13 @@ if __name__ == "__main__":
     new_result = []
     for line in result:
         if not re.match("\\s+", line):
-            new_line = ng.modify_line(unigram, bigram, line, total_tokens, ng.TOKENIZER, 10, 1)
+            new_line = ng.modify_line(unigram, bigram, line, total_tokens, ng.TOKENIZER, 50, 0.1, 1.7)
             new_result.append(new_line)
             print(new_line)
 
     # Write result
-    # reader.write_file(result, output_path+'corrected_text1')
-    # reader.write_file(new_result, output_path+'corrected_text2')
+    reader.write_file(result, output_path+'corrected_text1')
+    reader.write_file(new_result, output_path+'corrected_text2')
 
     # Evaluation
     result = reader.lines2string(result)
