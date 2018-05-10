@@ -7,6 +7,7 @@ import os
 import nltk
 
 if __name__ == "__main__":
+
     if 'output' in os.listdir('.'):
         data_path = './data/'
         output_path = "./output/"
