@@ -28,12 +28,14 @@ def nth_repl(s, sub, repl, nth):
         return s[:find]+repl+s[find + len(sub):]
     return s
 
+
 class NoisyTextCorrection:
 
     def __init__(self, rbm):
         self.rbm = rbm
         self.chars = string.ascii_letters
         self.puncs = string.punctuation
+        self.numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 
     def apply_all_rules(self, text):
         # apply rules on noisy text
@@ -45,10 +47,26 @@ class NoisyTextCorrection:
         return text
 
     def remove_garbage_strings(self, text):
-        word_seq = text.split(' ')
-        for word in word_seq:
-            if self._is_garbage(word):
-                text = text.replace(word, '')
+        """
+        Remove garbage strings and garbage lines
+        :param text: string
+        :return: string
+        """
+        n_punc = 0
+        punc_set = set()
+        for char in text:
+            if char not in self.chars and char is not ' ' and char not in self.numbers:
+                # Puncts
+                n_punc += 1
+                punc_set.add(char)
+        if n_punc / len(text) > 0.5 and len(punc_set) >= 3:
+            # A string consists of many random punctuations
+            text = "[Deleted line]"
+        else:
+            word_seq = text.split(' ')
+            for word in word_seq:
+                if self._is_garbage(word):
+                    text = text.replace(word, '____')
         return text
 
     def _is_garbage(self, word):
@@ -57,11 +75,15 @@ class NoisyTextCorrection:
             return False
         if len(word) > 40:
             return True
+        n_punc = 0
+        punc_set = set()
         if len(word) > 2:
             for char in word[1:-1]:
-                if char in self.puncs:
-                    count += 1
-        if count/len(word) > 0.5:
+                if char not in self.chars and char is not ' ' and char not in self.numbers:
+                    # Punctuations
+                    n_punc += 1
+                    punc_set.add(char)
+        if count/len(word) > 0.5 and len(punc_set) >= 3:
             return True
         return False
 
@@ -100,14 +122,14 @@ class NoisyTextCorrection:
         :param text: raw text
         :return: corrected text
         """
-        numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
         # apply rules on noisy text
         word_seq = nltk.word_tokenize(text)
         for word in word_seq:
             word = re.sub('^\W+$', '', word)
             corrected_word = word
             continue_loop = 1
-            if word not in self.rbm.vocabulary and word.lower() not in self.rbm.vocabulary and word != '':
+            if word not in self.rbm.vocabulary and word.lower() not in self.rbm.vocabulary and word != ''\
+                    and word not in self.rbm.long_vocabulary and word.lower() not in self.rbm.long_vocabulary:
                 # Only process wrong word
                 max_count = 0  # only apply most frequent rule
                 for key, sub_list in self.rbm.char_rules.items():
@@ -123,9 +145,23 @@ class NoisyTextCorrection:
                         for candidate, count in sub_list:
                             # print(key, candidate, count)
                             for i in range(n_subs):
-                                replaced = nth_repl(word, key, candidate, i+1)
-                                if replaced in self.rbm.vocabulary:
-                                    if key in numbers and candidate in numbers:
+                                replaced = nth_repl(word, key, candidate, i+1)  # replace n-th letter
+                                if replaced in self.rbm.vocabulary or replaced.lower() in self.rbm.vocabulary:
+                                    # First, only consider words in small vocabulary
+                                    if key in self.numbers and candidate in self.numbers:
+                                        # Do not correct numbers
+                                        continue
+                                    else:
+                                        if int(count) > max_count:
+                                            # corrected_word = word.replace(key, candidate)
+                                            # print(key, candidate, corrected_word)
+                                            corrected_word = replaced
+                                            continue_loop = 0
+                                            max_count = int(count)
+                                elif replaced in self.rbm.long_vocabulary \
+                                        or replaced.lower() in self.rbm.long_vocabulary:
+                                    # If replaced word not in small vocabulary, look whether it's in long vocab
+                                    if key in self.numbers and candidate in self.numbers:
                                         # Do not correct numbers
                                         continue
                                     else:
@@ -138,6 +174,8 @@ class NoisyTextCorrection:
                 # Checked all rules, best substitution found
                 if continue_loop == 0:
                     # the word is changed
+                    if word.startswith('*'):
+                        word = word.replace("*", "\*", 1)
                     p1 = ' ' + word + ' '
                     p2 = ' ' + word + '$'
                     p3 = '^' + word + ' '
@@ -148,6 +186,38 @@ class NoisyTextCorrection:
 
         return text
 
+    def new_apply_char_rule(self, text):
+        word_seq = nltk.word_tokenize(text)
+        for word in word_seq:
+            word = re.sub('^\W+$', '', word)
+            corrected_word = word
+            if word not in self.rbm.vocabulary and word.lower() not in self.rbm.vocabulary and word != ''\
+                    and word not in self.rbm.long_vocabulary and word.lower() not in self.rbm.long_vocabulary:
+                candidates = []
+                for key, target_ch_list in self.rbm.char_rules.items():
+                    # For rules correcting key
+                    if key in self.chars:
+                        # for all regular letters, find all occurrences in the word
+                        n_subs = len(re.findall(key, word))  # find how many keys found in word
+                    elif key in word:
+                        # for other puncs and numbers, only substitute once
+                        n_subs = 1
+                    else:
+                        n_subs = 0
+                    if n_subs > 0:
+                        for target_ch, count in target_ch_list:
+                            for i in range(n_subs):
+                                replaced = nth_repl(word, key, target_ch, i+1)  # replace n-th letter
+                                if replaced in self.rbm.vocabulary or replaced.lower() in self.rbm.vocabulary:
+                                    # Add replaced word and rule's count to candidates
+                                    if replaced in self.rbm.unigram:
+                                        candidates.append((replaced, count))
+
+
+
+
+
+        return text
     def process(self, text):
         # main method to process noisy text
 
@@ -171,7 +241,9 @@ class RuleBasedModel:
         self.syncope_rules = {}
         self.variant_spelling = {}
         self.char_rules = {}
-        self.vocabulary = []
+        self.vocabulary = set()
+        self.long_vocabulary = set()
+        self.unigram = {}
         self.place_names = []
         self.personal_names = []
         self.dis_bigrams = []
@@ -190,17 +262,19 @@ class RuleBasedModel:
         """
         Read char rules and vocabularies in to rule-based model.
         """
-        ruleset_list = ['CharRules.txt', 'vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt', 'unigram']
+        ruleset_list = ['CharRules.txt', 'vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt',
+                        'unigram.txt', 'words_long.txt']
         for filename in ruleset_list:
             file_path = os.path.join(self.path, filename)
             ruleset = {}
             voc = []
+            unigram_dict = {}
             with open(file_path, 'r', encoding='utf-8') as r_f:
                 content = r_f.read()
                 rule_list = content.split('\n')
                 # If not vocabulary
                 if filename not in ['vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt',
-                                    'DisambigTwograms.txt', 'unigram']:
+                                    'DisambigTwograms.txt', 'unigram.txt', 'words_long.txt']:
                     for rule in rule_list:
                         elements = rule.split(';')
                         if int(elements[2]) > 10:
@@ -214,11 +288,20 @@ class RuleBasedModel:
                     for word in rule_list:
                         if filename == 'DisambigTwograms.txt':
                             voc.append(word.strip('\n').split('\t')[0])
+                        elif filename == 'unigram.txt':
+                            unigram, count = word.strip('\n').split(' ')[0].lower(), int(word.strip('\n').split(' ')[1])
+                            unigram_dict[unigram] = count
+                            voc.append(unigram)
                         else:
-                            voc.append(word.strip('\n').split(' ')[0])
+                            voc.append(word.strip('\n').split(' ')[0].lower())
                     # if filename == 'vocabulary.txt':
-                    if filename == 'unigram':
+                    if filename == 'unigram.txt':
                         self.vocabulary = set(voc)
+                        self.unigram = unigram_dict
+                    elif filename == 'vocabulary.txt':
+                        self.long_vocabulary = self.long_vocabulary.union(set(voc))
+                    # elif filename == 'words_long.txt':
+                    #     self.long_vocabulary = self.long_vocabulary.union(set(voc))
                     elif filename == 'PlaceNames.txt':
                         self.place_names = set(voc)
                     elif filename == 'PersonalNames.txt':
@@ -260,7 +343,6 @@ class RuleBasedModel:
                 else:
                     # Read vocabulary
                     for word in rule_list:
-
                         if filename == 'DisambigTwograms.txt':
                             voc.append(word.strip('\n').split('\t')[0])
                         else:
@@ -279,7 +361,8 @@ class RuleBasedModel:
 if __name__ == '__main__':
     rule_model = RuleBasedModel('ruleset')
     rule_model.read_char_rule_and_vocab()
-    ntc = NoisyTextCorrection(rule_model)
-    cr = ntc.apply_char_rule('Darling Gopher -The day we got to Naples Wns simply henvenly. I posted you a letter from there the minute I reached the Hotel.')
+    print(rule_model.unigram)
+    # ntc = NoisyTextCorrection(rule_model)
+    # cr = ntc.apply_char_rule('Darling Gopher -The day we got to Naples Wns simply henvenly. I posted you a letter from there the minute I reached the Hotel.')
 
 
