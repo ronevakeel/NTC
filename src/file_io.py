@@ -65,7 +65,7 @@ def write_file(lines, filename):
     :type filename: str
     :param filename: the name of output file, the default name is ""cleaned_newberry-mary-b-some-further-accounts-of-the-nile-1912-1913.txt"
     """
-    output_file = open(filename, 'w')
+    output_file = open(filename, 'w', encoding='utf-8')
     for line in lines:
         output_file.write(line + "\n")
 

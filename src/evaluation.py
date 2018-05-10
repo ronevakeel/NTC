@@ -20,7 +20,17 @@ def evaluate(result_string, gold_string):
     """
     re_seq = nltk.word_tokenize(result_string)
     gold_seq = nltk.word_tokenize(gold_string)
-    eval_result = wer.calculate_wer(gold_seq, re_seq)
+    # re_seq = result_string.split(' ')
+    # gold_seq = gold_string.split(' ')
+    new_re_seq = []
+    for word in re_seq:
+        if word != '':
+            new_re_seq.append(word)
+    new_gold_seq = []
+    for word in gold_seq:
+        if word != '':
+            new_gold_seq.append(word)
+    eval_result = wer.calculate_wer(new_gold_seq, new_re_seq)
 
     return eval_result
 
