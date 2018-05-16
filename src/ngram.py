@@ -8,6 +8,31 @@ WHITE_SPACE = 0
 TOKENIZER = 1
 
 
+class ngram_model:
+
+    def __init__(self, unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold, NE_list={}):
+        """
+        :param unigram: a dictionary of unigrams in the training corpus
+        :param bigram: a dictionary of bigrams in the training corpus
+        :param total_tokens: the sive of the training corpus
+        :param len_unigram_dict: an unigram dictionary indexed by unigram length
+        :param split_strategy: the way to split tokens
+        :param topN: the number of candidates for each word waiting to be corrected
+        :param delta: the value of delta used to smooth the probability
+        :param threshold: the threshold for the cost of candidate selection
+        :param NE_list: possible name entity in the raw data
+        """
+        self.unigram = unigram
+        self.bigram = bigram
+        self.total_tokens = total_tokens
+        self.len_unigram_dict = len_unigram_dict
+        self.split_strategy = split_strategy
+        self.topN = topN
+        self.delta = delta
+        self.threshold = threshold
+        self.NE_list = NE_list
+
+
 def readfile(file_name):
     '''
     Get a list of lines from the file.
@@ -39,9 +64,9 @@ def writefile(unigram, bigram, path):
     bi_file = open(os.path.join(path, "bigram"), 'w')
 
     for item, value in unigram.items():
-        uni_file.write(item + " " + str(value) + "\n")
+        uni_file.write(item + "\t" + str(value) + "\n")
     for item, value in bigram.items():
-        bi_file.write(item[0] + " " + item[1] + " " + str(value) + "\n")
+        bi_file.write(item[0] + "\t" + item[1] + "\t" + str(value) + "\n")
 
 
 def get_files(dir, file_list):
@@ -105,16 +130,67 @@ def splitstr(line, split_strategy):
     return items
 
 
+def read_ngram_model(model_path, split_strategy, topN, delta, threshold, NE_list={}):
+    unigram_path = os.path.join(model_path, "unigram")
+    bigram_path = os.path.join(model_path, "bigram")
+    unigram, max_length = read_unigram_file(unigram_path)
+    bigram = read_bigram_file(bigram_path)
+    total_tokens = sum(unigram.values())
+    len_unigram_dict = get_len_unigram_dict(unigram, max_length)
+    return ngram_model(unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold, NE_list)
+
+
+def get_len_unigram_dict(unigram, max_length):
+    len_unigram_dict = []
+    for i in range(max_length):
+        len_unigram_dict.append({})
+    for key, value in unigram.items():
+        length = len(key)
+        len_unigram_dict[length-1][key] = value
+    return len_unigram_dict
+
+
+def read_unigram_file(file_path):
+    unigram = {}
+    lines = open(file_path, 'r').readlines()
+    max_length = 0
+    for line in lines:
+        line = line.strip()
+        if re.match("\\s+", line):
+            continue
+        strs = line.split("\t")
+        unigram[strs[0]] = int(strs[1])
+        length = len(strs[0])
+        if length > max_length:
+            max_length = length
+    return unigram, max_length
+
+
+def read_bigram_file(file_path):
+    bigram = {}
+    lines = open(file_path, 'r').readlines()
+    for line in lines:
+        line = line.strip()
+        if re.match("\\s+", line):
+            continue
+        strs = line.split("\t")
+        bg = (strs[0], strs[1])
+        bigram[bg] = int(strs[2])
+    return bigram
+
+
 def ngrammodel(data_path, output_path):
     '''
     Given a data directory and output directory, generate files that store the count of unigrams and bigrams
     :param data_path: the directory of training data
     :param output_path: the directory to store counting data
     '''
+    history_corpus = "local/"
+    modern_corpus = "other_corpus/"
     all_files = []
     unigramdict = {}
     bigramdict = {}
-    get_files(data_path, all_files)
+    get_files(data_path + history_corpus, all_files)
     for file in all_files:
         try:
             contentlist = readfile(file)
@@ -122,9 +198,59 @@ def ngrammodel(data_path, output_path):
             # print(file)
             continue
         count_appearance(contentlist, unigramdict, bigramdict, TOKENIZER)
+
+    other_corpus = True
+    if other_corpus:
+        read_modern_corpus(data_path + modern_corpus, unigramdict, bigramdict)
+
     writefile(unigramdict, bigramdict, output_path)
     total_tokens = sum(unigramdict.values())
     return unigramdict, bigramdict, total_tokens
+
+
+def read_modern_corpus(data_path, unigram, bigram):
+    files = os.listdir(data_path)
+    for f in files:
+        if operator.eq(f, ".DS_Store"):
+            continue
+        sentence_file_path = os.path.join(data_path, f)
+        content = read_sentence_file(sentence_file_path)
+        count_appearance(content, unigram, bigram, TOKENIZER)
+
+
+def read_sentence_file(file_path):
+    content = []
+    lines = open(file_path, 'r').readlines()
+    for line in lines:
+        line = line.strip()
+        if re.match("\\s+", line):
+            continue
+        sentence = line.split("\t")[1]
+        content.append(sentence)
+    return content
+
+
+def get_possible_NE_list(file_list):
+    import src.file_io as reader
+    NE_dict = {}
+    for file in file_list:
+        data = reader.read_file(file)
+        data = reader.clean_empty_line(data)
+        for line in data:
+            tokens = nltk.tokenize.word_tokenize(line)
+            token_pos_list = nltk.pos_tag(tokens)
+            for pair in token_pos_list:
+                word = pair[0]
+                pos = pair[1]
+                if not re.match("\\w+", word):
+                    continue
+                if pos.startswith("N") and word[0].isupper():
+                    word = word.lower()
+                    if word not in NE_dict:
+                        NE_dict[word] = 1
+                    else:
+                        NE_dict[word] += 1
+    return NE_dict
 
 
 def wf_levenshtein(string_1, string_2):
@@ -167,30 +293,52 @@ def wf_levenshtein(string_1, string_2):
     return d[-1]
 
 
-def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN, delta, threshold):
+def modify_line(statistic_model, input_line):
     '''
     Get the correction of a given line of string
-    :param unigram: a dictionary of unigrams in the training corpus
-    :param bigram: a dictionary of bigrams in the training corpus
+    :param statistic_model: the statistic_model
     :param input_line: the line of string waiting to be corrected
-    :param total_tokens: the sive of the training corpus
-    :param split_strategy: the way to split tokens
-    :param topN: the number of candidates for each word waiting to be corrected
-    :param delta: the value of delta used to smooth the probability
-    :param threshold: the threshold for the cost of candidate selection
     :return: a corrected line of string with highest generation probability
     '''
+    unigram = statistic_model.unigram
+    bigram = statistic_model.bigram
+    total_tokens = statistic_model.total_tokens
+    len_unigram_dict = statistic_model.len_unigram_dict
+    split_strategy = statistic_model.split_strategy
+    topN = statistic_model.topN
+    threshold = statistic_model.threshold
+    delta = statistic_model.delta
+    possible_name_entity_dict = statistic_model.NE_list
     words = splitstr(input_line, split_strategy)
     line_candidate = []
     for word in words:
-        if word in unigram:
+        if not need_modify(word, unigram, possible_name_entity_dict, 3):
+        # if word in unigram:
             line_candidate.append([(word, 1)])
         else:
-            candidates = get_candidate(word, unigram, topN, threshold)
+            candidates = get_candidate(word, unigram, len_unigram_dict, topN, threshold)
             line_candidate.append(candidates)
     corrected_words = bestoutput(unigram, bigram, line_candidate, total_tokens, delta)
 
     return replace_words(input_line, words, corrected_words)
+
+
+def need_modify(err_word, unigram, name_entity_dict, threshold):
+    if err_word in unigram:
+        return False
+    if err_word in name_entity_dict and name_entity_dict[err_word] > threshold:
+        return False
+    pos = nltk.pos_tag([err_word])[0][1]
+    if operator.eq(pos, "NNS"):
+        if err_word.endswith("es"):
+            new_err_word = err_word[0:-2]
+            if new_err_word in unigram:
+                return False
+        if err_word.endswith("s"):
+            new_err_word = err_word[0:-1]
+            if new_err_word in unigram:
+                return False
+    return True
 
 
 def bestoutput(unigram, bigram, line_candidates, total_tokens, delta):
@@ -322,13 +470,15 @@ def get_bigram_prob(bigram_cand, unigram_dict, bigram_dict, delta, total_tokens)
     else:
         total += total_tokens
     return float(cw) / (total * bigram_cost[1])
+    # return float(cw)
 
 
-def get_candidate(err_word, unigram_dic, topN, threshold):
+def get_candidate(err_word, unigram_dic, len_unigram_dic, topN, threshold):
     """
     Find N candidates of a error word with the lowest cost
     :param err_word: the word to be corrected
     :param unigram_dic: dictionary of unigrams
+    :param len_unigram_dic: dictionary of unigrams indexed by its length
     :param topN: the number of candidate to be selected
     :return: a list of candidate and its cost
     """
@@ -339,27 +489,22 @@ def get_candidate(err_word, unigram_dic, topN, threshold):
         candidate.append(err_word)
         return candidate
     else:
-        for word in unigram_dic.keys():
-            cost = wf_levenshtein(err_word_low, word)
-            if err_word[0].isupper():
-                word = word.capitalize()
-            if cost > threshold:
-                continue
-            cost += 1
-            if len(candidate) < topN:
-                candidate.append((word, cost))
-            else:
-                biggest_index, biggest_cost = find_biggest(candidate)
-                if cost < biggest_cost:
-                    candidate[biggest_index] = (word, cost)
-    """
-    final_cand = []
-    final_cand.append(err_word)
-    for item in candidate:
-        token = item[0]
-        final_cand.append(token)
-    return final_cand
-    """
+        word_len_index = len(err_word) - 1
+        for i in range(word_len_index-1, word_len_index+2):
+            uni_dict = len_unigram_dic[i]
+            for word in uni_dict.keys():
+                cost = wf_levenshtein(err_word_low, word)
+                if cost > threshold:
+                    continue
+                if err_word[0].isupper():
+                    word = word.capitalize()
+                cost += 1
+                if len(candidate) < topN:
+                    candidate.append((word, cost))
+                else:
+                    biggest_index, biggest_cost = find_biggest(candidate)
+                    if cost < biggest_cost:
+                        candidate[biggest_index] = (word, cost)
     candidate = clean_candidate(candidate)
     candidate.append((err_word, 1))
     return candidate
@@ -408,7 +553,9 @@ def find_biggest(items):
 
 if __name__ == "__main__":
 
-    data_path = "../data/local/"
+    data_path = "../data/"
+    history_corpus = "historical_corpus/"
+    modern_corpus = "other_corpus/"
     model_path = "../output/"
     unigram, bigram, total_tokens = ngrammodel(data_path, model_path)
 
