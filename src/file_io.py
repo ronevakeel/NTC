@@ -8,23 +8,35 @@
 
 import operator
 import re
+import os
 
 
-def get_all_files(file_index=[]):
+def get_all_evaluation_files():
     raw_text_directory = "../data/OCR_text/"
     gold_standard_directory = "../data/gold_standard/"
     raw_file_path = []
     gold_file_path = []
-    if len(file_index) != 0:
-        for index in file_index:
-            if index > 27 or index < 0:
-                continue
-            raw_file_path.append(raw_text_directory + "NMB_" + str(index) + ".txt")
-            gold_file_path.append(gold_standard_directory + "ESF_" + str(index) + ".txt")
-    else:
-        for index in range(28):
-            raw_file_path.append(raw_text_directory + "NMB_" + str(index) + ".txt")
-            gold_file_path.append(gold_standard_directory + "ESF_" + str(index) + ".txt")
+    data_path1 = "Emma/"
+    data_path2 = "newberry-mary-b-some-further-accounts-of-the-nile-1912-1913/"
+
+    raw_path1 = raw_text_directory + data_path1
+    gold_path1 = gold_standard_directory + data_path1
+
+    raw_path2 = raw_text_directory + data_path2
+    gold_path2 = gold_standard_directory + data_path2
+
+    for i in range(1, 20):
+        raw_file = raw_path1 + "eba-v" + str(i) + ".txt"
+        gold_file = gold_path1 + "EBA-" + str(i) + ".txt"
+        raw_file_path.append(raw_file)
+        gold_file_path.append(gold_file)
+
+    for i in range(0, 28):
+        raw_file = raw_path2 + "NMB_" + str(i) + ".txt"
+        gold_file = gold_path2 + "ESF_" + str(i) + ".txt"
+        raw_file_path.append(raw_file)
+        gold_file_path.append(gold_file)
+
     return raw_file_path, gold_file_path
 
 

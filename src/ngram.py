@@ -7,6 +7,7 @@ import math
 WHITE_SPACE = 0
 TOKENIZER = 1
 
+
 class ngram_model:
 
     def __init__(self, unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold, NE_list={}):
@@ -129,14 +130,14 @@ def splitstr(line, split_strategy):
     return items
 
 
-def read_ngram_model(model_path, split_strategy, topN, delta, threshold):
+def read_ngram_model(model_path, split_strategy, topN, delta, threshold, NE_list={}):
     unigram_path = os.path.join(model_path, "unigram")
     bigram_path = os.path.join(model_path, "bigram")
     unigram, max_length = read_unigram_file(unigram_path)
     bigram = read_bigram_file(bigram_path)
     total_tokens = sum(unigram.values())
     len_unigram_dict = get_len_unigram_dict(unigram, max_length)
-    return ngram_model(unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold)
+    return ngram_model(unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold, NE_list)
 
 
 def get_len_unigram_dict(unigram, max_length):
@@ -235,16 +236,20 @@ def get_possible_NE_list(file_list):
     for file in file_list:
         data = reader.read_file(file)
         data = reader.clean_empty_line(data)
-        tokens = nltk.tokenize.word_tokenize(data)
-        token_pos_list = nltk.pos_tag(tokens)
-        for pair in token_pos_list:
-            word = pair[0]
-            pos = pair[1]
-            if pos.startswith("N") and word[0].isupper():
-                if word not in NE_dict:
-                    NE_dict[word] = 1
-                else:
-                    NE_dict[word] += 1
+        for line in data:
+            tokens = nltk.tokenize.word_tokenize(line)
+            token_pos_list = nltk.pos_tag(tokens)
+            for pair in token_pos_list:
+                word = pair[0]
+                pos = pair[1]
+                if not re.match("\\w+", word):
+                    continue
+                if pos.startswith("N") and word[0].isupper():
+                    word = word.lower()
+                    if word not in NE_dict:
+                        NE_dict[word] = 1
+                    else:
+                        NE_dict[word] += 1
     return NE_dict
 
 
@@ -303,10 +308,11 @@ def modify_line(statistic_model, input_line):
     topN = statistic_model.topN
     threshold = statistic_model.threshold
     delta = statistic_model.delta
+    possible_name_entity_dict = statistic_model.NE_list
     words = splitstr(input_line, split_strategy)
     line_candidate = []
     for word in words:
-        if not need_modify(word, unigram):
+        if not need_modify(word, unigram, possible_name_entity_dict, 3):
         # if word in unigram:
             line_candidate.append([(word, 1)])
         else:
@@ -317,8 +323,10 @@ def modify_line(statistic_model, input_line):
     return replace_words(input_line, words, corrected_words)
 
 
-def need_modify(err_word, unigram):
+def need_modify(err_word, unigram, name_entity_dict, threshold):
     if err_word in unigram:
+        return False
+    if err_word in name_entity_dict and name_entity_dict[err_word] > threshold:
         return False
     pos = nltk.pos_tag([err_word])[0][1]
     if operator.eq(pos, "NNS"):
@@ -497,15 +505,6 @@ def get_candidate(err_word, unigram_dic, len_unigram_dic, topN, threshold):
                     biggest_index, biggest_cost = find_biggest(candidate)
                     if cost < biggest_cost:
                         candidate[biggest_index] = (word, cost)
-
-    """
-    final_cand = []
-    final_cand.append(err_word)
-    for item in candidate:
-        token = item[0]
-        final_cand.append(token)
-    return final_cand
-    """
     candidate = clean_candidate(candidate)
     candidate.append((err_word, 1))
     return candidate
@@ -555,7 +554,7 @@ def find_biggest(items):
 if __name__ == "__main__":
 
     data_path = "../data/"
-    history_corpus = "local/"
+    history_corpus = "historical_corpus/"
     modern_corpus = "other_corpus/"
     model_path = "../output/"
     unigram, bigram, total_tokens = ngrammodel(data_path, model_path)
