@@ -7,6 +7,28 @@ import math
 WHITE_SPACE = 0
 TOKENIZER = 1
 
+class ngram_model:
+
+    def __init__(self, unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold):
+        """
+        :param unigram: a dictionary of unigrams in the training corpus
+        :param bigram: a dictionary of bigrams in the training corpus
+        :param total_tokens: the sive of the training corpus
+        :param len_unigram_dict: an unigram dictionary indexed by unigram length
+        :param split_strategy: the way to split tokens
+        :param topN: the number of candidates for each word waiting to be corrected
+        :param delta: the value of delta used to smooth the probability
+        :param threshold: the threshold for the cost of candidate selection
+        """
+        self.unigram = unigram
+        self.bigram = bigram
+        self.total_tokens = total_tokens
+        self.len_unigram_dict = len_unigram_dict
+        self.split_strategy = split_strategy
+        self.topN = topN
+        self.delta = delta
+        self.threshold = threshold
+
 
 def readfile(file_name):
     '''
@@ -105,25 +127,40 @@ def splitstr(line, split_strategy):
     return items
 
 
-def read_ngram_model(model_path):
+def read_ngram_model(model_path, split_strategy, topN, delta, threshold):
     unigram_path = os.path.join(model_path, "unigram")
     bigram_path = os.path.join(model_path, "bigram")
-    unigram = read_unigram_file(unigram_path)
+    unigram, max_length = read_unigram_file(unigram_path)
     bigram = read_bigram_file(bigram_path)
     total_tokens = sum(unigram.values())
-    return unigram, bigram, total_tokens
+    len_unigram_dict = get_len_unigram_dict(unigram, max_length)
+    return ngram_model(unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold)
+
+
+def get_len_unigram_dict(unigram, max_length):
+    len_unigram_dict = []
+    for i in range(max_length):
+        len_unigram_dict.append({})
+    for key, value in unigram.items():
+        length = len(key)
+        len_unigram_dict[length-1][key] = value
+    return len_unigram_dict
 
 
 def read_unigram_file(file_path):
     unigram = {}
     lines = open(file_path, 'r').readlines()
+    max_length = 0
     for line in lines:
         line = line.strip()
         if re.match("\\s+", line):
             continue
         strs = line.split("\t")
         unigram[strs[0]] = int(strs[1])
-    return unigram
+        length = len(strs[0])
+        if length > max_length:
+            max_length = length
+    return unigram, max_length
 
 
 def read_bigram_file(file_path):
@@ -230,26 +267,29 @@ def wf_levenshtein(string_1, string_2):
     return d[-1]
 
 
-def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN, delta, threshold):
+def modify_line(statistic_model, input_line):
     '''
     Get the correction of a given line of string
-    :param unigram: a dictionary of unigrams in the training corpus
-    :param bigram: a dictionary of bigrams in the training corpus
+    :param statistic_model: the statistic_model
     :param input_line: the line of string waiting to be corrected
-    :param total_tokens: the sive of the training corpus
-    :param split_strategy: the way to split tokens
-    :param topN: the number of candidates for each word waiting to be corrected
-    :param delta: the value of delta used to smooth the probability
-    :param threshold: the threshold for the cost of candidate selection
     :return: a corrected line of string with highest generation probability
     '''
+    unigram = statistic_model.unigram
+    bigram = statistic_model.bigram
+    total_tokens = statistic_model.total_tokens
+    len_unigram_dict = statistic_model.len_unigram_dict
+    split_strategy = statistic_model.split_strategy
+    topN = statistic_model.topN
+    threshold = statistic_model.threshold
+    delta = statistic_model.delta
     words = splitstr(input_line, split_strategy)
     line_candidate = []
     for word in words:
         if not need_modify(word, unigram):
+        # if word in unigram:
             line_candidate.append([(word, 1)])
         else:
-            candidates = get_candidate(word, unigram, topN, threshold)
+            candidates = get_candidate(word, unigram, len_unigram_dict, topN, threshold)
             line_candidate.append(candidates)
     corrected_words = bestoutput(unigram, bigram, line_candidate, total_tokens, delta)
 
@@ -404,11 +444,12 @@ def get_bigram_prob(bigram_cand, unigram_dict, bigram_dict, delta, total_tokens)
     # return float(cw)
 
 
-def get_candidate(err_word, unigram_dic, topN, threshold):
+def get_candidate(err_word, unigram_dic, len_unigram_dic, topN, threshold):
     """
     Find N candidates of a error word with the lowest cost
     :param err_word: the word to be corrected
     :param unigram_dic: dictionary of unigrams
+    :param len_unigram_dic: dictionary of unigrams indexed by its length
     :param topN: the number of candidate to be selected
     :return: a list of candidate and its cost
     """
@@ -419,21 +460,23 @@ def get_candidate(err_word, unigram_dic, topN, threshold):
         candidate.append(err_word)
         return candidate
     else:
-        for word in unigram_dic.keys():
-            if len(err_word) - 1 > len(word) or len(err_word) + 1 < len(word):
-                continue
-            cost = wf_levenshtein(err_word_low, word)
-            if err_word[0].isupper():
-                word = word.capitalize()
-            if cost > threshold:
-                continue
-            cost += 1
-            if len(candidate) < topN:
-                candidate.append((word, cost))
-            else:
-                biggest_index, biggest_cost = find_biggest(candidate)
-                if cost < biggest_cost:
-                    candidate[biggest_index] = (word, cost)
+        word_len_index = len(err_word) - 1
+        for i in range(word_len_index-1, word_len_index+2):
+            uni_dict = len_unigram_dic[i]
+            for word in uni_dict.keys():
+                cost = wf_levenshtein(err_word_low, word)
+                if cost > threshold:
+                    continue
+                if err_word[0].isupper():
+                    word = word.capitalize()
+                cost += 1
+                if len(candidate) < topN:
+                    candidate.append((word, cost))
+                else:
+                    biggest_index, biggest_cost = find_biggest(candidate)
+                    if cost < biggest_cost:
+                        candidate[biggest_index] = (word, cost)
+
     """
     final_cand = []
     final_cand.append(err_word)

@@ -34,17 +34,17 @@ if __name__ == "__main__":
     # Statistical system
     print("Statistical ...")
     # unigram, bigram, total_tokens = ng.ngrammodel(n_gram_data_path, output_path)
-    unigram, bigram, total_tokens = ng.read_ngram_model(output_path)
+    statistic_model = ng.read_ngram_model(output_path, ng.TOKENIZER, 50, 0.1, 1.7)
     new_result = []
     for line in result:
         if not re.match("\\s+", line):
-            new_line = ng.modify_line(unigram, bigram, line, total_tokens, ng.TOKENIZER, 50, 0.1, 1.7)
+            new_line = ng.modify_line(statistic_model, line)
             new_result.append(new_line)
 
     # Write result
     print('Writing result ...')
     reader.write_file(result, output_path+'corrected_text1')
-    reader.write_file(new_result, output_path+'corrected_text2')
+    reader.write_file(new_result, output_path+'corrected_text2_judged')
 
     # Evaluation
     print('Evaluation ...')
