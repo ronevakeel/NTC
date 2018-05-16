@@ -34,10 +34,10 @@ if __name__ == "__main__":
     print("Statistical ...")
     unigram, bigram, total_tokens = ng.ngrammodel(n_gram_data_path, output_path)
     new_result = []
-    for line in result:
-        if not re.match("\\s+", line):
-            new_line = ng.modify_line(unigram, bigram, line, total_tokens, ng.TOKENIZER, 50, 0.1, 1.7)
-            new_result.append(new_line)
+    # for line in result:
+    #     if not re.match("\\s+", line):
+    #         new_line = ng.modify_line(unigram, bigram, line, total_tokens, ng.TOKENIZER, 50, 0.1, 1.7)
+    #         new_result.append(new_line)
 
     # Write result
     print('Writing result ...')
@@ -53,8 +53,8 @@ if __name__ == "__main__":
     gold = reader.clean_empty_line(gold)
     gold = reader.lines2string(gold)
 
-    print('WER in raw text:', evaluation.evaluate(data, gold))
-    print('WER after rule-based system:', evaluation.evaluate(result, gold))
-    print('WER after rule-based and statistical system', evaluation.evaluate(new_result, gold))
+    # print('WER in raw text:', evaluation.evaluate(data, gold))
+    print('WER after rule-based system:', evaluation.evaluate(result, gold, False))
+    # print('WER after rule-based and statistical system:', evaluation.evaluate(new_result, gold))
 
 
