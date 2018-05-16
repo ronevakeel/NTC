@@ -146,6 +146,11 @@ class RuleBasedModel:
         return False
 
     def new_apply_char_rule(self, text):
+        """
+        Apply character based correction rule on text
+        :param text: str
+        :return: str
+        """
         word_seq = nltk.word_tokenize(text)
         for word in word_seq:
             word = re.sub('^\W+$', '', word)
@@ -190,14 +195,32 @@ class RuleBasedModel:
                     text = text.replace(p1, ' ' + corrected_word + ' ')
                     text = re.sub(p2, ' ' + corrected_word, text)
                     text = re.sub(p3, corrected_word + ' ', text)
+        return text
 
-
+    def merge_words(self, text):
+        """
+        Merge adjacent tokens if they can form a word
+        :param text: str
+        :return: str
+        """
+        word_seq = text.split(' ')
+        n_word = len(word_seq)
+        for i in range(n_word-1):
+            first_word = word_seq[i]
+            second_word = word_seq[i+1]
+            if first_word.lower() not in self.unigram and second_word.lower() not in self.unigram:
+                # Both words are not in the unigram
+                merged_word = first_word + second_word
+                if merged_word.lower() in self.unigram or merged_word.lower() in self.vocabulary:
+                    text = text.replace(first_word + ' ' + second_word, merged_word)
+                    print(first_word + ' ' + second_word, '->', merged_word)
         return text
 
     def process(self, text):
         # main method to process noisy text
 
         # Apply rules first
+        text = self.merge_words(text)
         text = self.remove_garbage_strings(text)
         text = self.new_apply_char_rule(text)
 

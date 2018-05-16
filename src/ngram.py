@@ -152,7 +152,7 @@ def get_len_unigram_dict(unigram, max_length):
 
 def read_unigram_file(file_path):
     unigram = {}
-    lines = open(file_path, 'r').readlines()
+    lines = open(file_path, 'r', encoding='utf-8').readlines()
     max_length = 0
     for line in lines:
         line = line.strip()
@@ -168,7 +168,7 @@ def read_unigram_file(file_path):
 
 def read_bigram_file(file_path):
     bigram = {}
-    lines = open(file_path, 'r').readlines()
+    lines = open(file_path, 'r', encoding='utf-8').readlines()
     for line in lines:
         line = line.strip()
         if re.match("\\s+", line):
