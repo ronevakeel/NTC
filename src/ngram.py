@@ -111,10 +111,12 @@ def ngrammodel(data_path, output_path):
     :param data_path: the directory of training data
     :param output_path: the directory to store counting data
     '''
+    history_corpus = "local/"
+    modern_corpus = "other_corpus/"
     all_files = []
     unigramdict = {}
     bigramdict = {}
-    get_files(data_path, all_files)
+    get_files(data_path + history_corpus, all_files)
     for file in all_files:
         try:
             contentlist = readfile(file)
@@ -122,9 +124,38 @@ def ngrammodel(data_path, output_path):
             # print(file)
             continue
         count_appearance(contentlist, unigramdict, bigramdict, TOKENIZER)
+
+    other_corpus = True
+    if other_corpus:
+        read_modern_corpus(data_path + modern_corpus, unigramdict, bigramdict)
+
     writefile(unigramdict, bigramdict, output_path)
     total_tokens = sum(unigramdict.values())
     return unigramdict, bigramdict, total_tokens
+
+
+def read_modern_corpus(data_path, unigram, bigram):
+    files = os.listdir(data_path)
+    for f in files:
+        if operator.eq(f, ".DS_Store"):
+            continue
+        path = os.path.join(data_path, f)
+        files = os.listdir(path)
+        sentence_file_path = os.path.join(path, f)
+        content = read_sentence_file(sentence_file_path)
+        count_appearance(content, unigram, bigram, TOKENIZER)
+
+
+def read_sentence_file(file_path):
+    content = []
+    lines = open(file_path, 'r').readlines()
+    for line in lines:
+        line = line.strip()
+        if re.match("\\s+", line):
+            continue
+        sentence = line.split("\t")[1]
+        content.append(sentence)
+    return content
 
 
 def wf_levenshtein(string_1, string_2):
@@ -340,6 +371,8 @@ def get_candidate(err_word, unigram_dic, topN, threshold):
         return candidate
     else:
         for word in unigram_dic.keys():
+            if len(err_word) - 1 > len(word) or len(err_word) + 1 < len(word):
+                continue
             cost = wf_levenshtein(err_word_low, word)
             if err_word[0].isupper():
                 word = word.capitalize()
@@ -408,7 +441,9 @@ def find_biggest(items):
 
 if __name__ == "__main__":
 
-    data_path = "../data/local/"
+    data_path = "../data/"
+    history_corpus = "local/"
+    modern_corpus = "other_corpus/"
     model_path = "../output/"
     unigram, bigram, total_tokens = ngrammodel(data_path, model_path)
 
