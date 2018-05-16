@@ -5,6 +5,8 @@ import os
 import re
 import nltk
 import string
+from operator import itemgetter
+
 
 def nth_repl(s, sub, repl, nth):
     """
@@ -29,22 +31,78 @@ def nth_repl(s, sub, repl, nth):
     return s
 
 
-class NoisyTextCorrection:
-
-    def __init__(self, rbm):
-        self.rbm = rbm
+class RuleBasedModel:
+    def __init__(self, ruleset_folder):
+        """
+        :param ruleset_folder: the folder name
+        """
+        self.char_rules = {}
+        self.vocabulary = set()  # set of unigrams
+        self.long_vocabulary = set()  # set of long vocabulary
+        self.unigram = {}  # dict of unigrams
+        self.place_names = []
+        self.personal_names = []
+        self.dis_bigrams = []
         self.chars = string.ascii_letters
         self.puncs = string.punctuation
         self.numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 
-    def apply_all_rules(self, text):
-        # apply rules on noisy text
+        if ruleset_folder in os.listdir('.'):
+            self.path = './' + ruleset_folder
+        elif ruleset_folder in os.listdir('..'):
+            self.path = '../' + ruleset_folder
+        else:
+            print('Wrong rule set folder name!')
+            exit(0)
+        self.read_char_rule_and_vocab()
 
-        ruleset_list = ['CorrectionRules.txt', 'FusingRules.txt',
-                        'HyphenRules.txt', 'SyncopeRules.txt', 'AmbiguousPairs.txt', 'VariantSpellings.txt']
-        for rule_name in ruleset_list:
-            self._apply_rule(text, rule_name)
-        return text
+    def read_char_rule_and_vocab(self):
+        """
+        Read char rules and vocabularies in to rule-based model.
+        """
+        ruleset_list = ['CharRules.txt', 'vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt',
+                        'unigram.txt', 'words_long.txt']
+        for filename in ruleset_list:
+            file_path = os.path.join(self.path, filename)
+            ruleset = {}
+            voc = []
+            unigram_dict = {}
+            with open(file_path, 'r', encoding='utf-8') as r_f:
+                content = r_f.read()
+                rule_list = content.split('\n')
+                # If not vocabulary
+                if filename not in ['vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt',
+                                    'DisambigTwograms.txt', 'unigram.txt', 'words_long.txt']:
+                    for rule in rule_list:
+                        elements = rule.split(';')
+                        if int(elements[2]) > 10:
+                            if elements[1] in ruleset:
+                                ruleset[elements[1]] = ruleset[elements[1]] + [(elements[0], elements[2])]
+                            else:
+                                ruleset[elements[1]] = [(elements[0], elements[2])]  # Store rule using dictionary
+                    self.char_rules = ruleset
+                else:
+                    # Read vocabulary
+                    for word in rule_list:
+                        if filename == 'DisambigTwograms.txt':
+                            voc.append(word.strip('\n').split('\t')[0])
+                        elif filename == 'unigram.txt':
+                            unigram, count = word.strip('\n').split(' ')[0].lower(), int(word.strip('\n').split(' ')[1])
+                            unigram_dict[unigram] = count
+                            voc.append(unigram)
+                        else:
+                            voc.append(word.strip('\n').split(' ')[0].lower())
+                    if filename == 'unigram.txt':
+                        self.vocabulary = set(voc)
+                        self.unigram = unigram_dict
+                    elif filename == 'vocabulary.txt':
+                        self.long_vocabulary = self.long_vocabulary.union(set(voc))
+                    elif filename == 'PlaceNames.txt':
+                        self.place_names = set(voc)
+                    elif filename == 'PersonalNames.txt':
+                        self.personal_names = set(voc)
+                    elif filename == 'DisambigTwograms.txt':
+                        self.dis_bigrams = set(voc)
 
     def remove_garbage_strings(self, text):
         """
@@ -87,114 +145,14 @@ class NoisyTextCorrection:
             return True
         return False
 
-    def _apply_rule(self, text, rule_type='CorrectionRules.txt'):
-        """
-        Apply selected rule on text.
-        :param text: str
-        :param rule_type: str
-        :return: str
-        """
-
-        if rule_type == 'CorrectionRules.txt':
-            for key, value in self.rbm.correction_rules.items():
-                text = text.replace(key, value)
-        elif rule_type == 'AmbiguousPairs.txt':
-            for key, value in self.rbm.ambiguous_pairs.items():
-                text = text.replace(key, value)
-        elif rule_type == 'FusingRules.txt':
-            for key, value in self.rbm.fusing_rules.items():
-                text = text.replace(key, value)
-        elif rule_type == 'HyphenRules.txt':
-            for key, value in self.rbm.hyphen_rules.items():
-                text = text.replace(key, value)
-        elif rule_type == 'SyncopeRules.txt':
-            for key, value in self.rbm.syncope_rules.items():
-                text = text.replace(key, value)
-        elif rule_type == 'VariantSpellings.txt':
-            for key, value in self.rbm.variant_spelling.items():
-                text = text.replace(key, value)
-
-        return text
-
-    def apply_char_rule(self, text):
-        """
-        Apply character rules on word level in CharRules.txt
-        :param text: raw text
-        :return: corrected text
-        """
-        # apply rules on noisy text
-        word_seq = nltk.word_tokenize(text)
-        for word in word_seq:
-            word = re.sub('^\W+$', '', word)
-            corrected_word = word
-            continue_loop = 1
-            if word not in self.rbm.vocabulary and word.lower() not in self.rbm.vocabulary and word != ''\
-                    and word not in self.rbm.long_vocabulary and word.lower() not in self.rbm.long_vocabulary:
-                # Only process wrong word
-                max_count = 0  # only apply most frequent rule
-                for key, sub_list in self.rbm.char_rules.items():
-                    if key in self.chars:
-                        # for all regular letters
-                        n_subs = len(re.findall(key, word))  # find how many keys found in word
-                    elif key in word:
-                        # for other puncs and numbers, only substitute once
-                        n_subs = 1
-                    else:
-                        n_subs = 0
-                    if n_subs > 0:
-                        for candidate, count in sub_list:
-                            # print(key, candidate, count)
-                            for i in range(n_subs):
-                                replaced = nth_repl(word, key, candidate, i+1)  # replace n-th letter
-                                if replaced in self.rbm.vocabulary or replaced.lower() in self.rbm.vocabulary:
-                                    # First, only consider words in small vocabulary
-                                    if key in self.numbers and candidate in self.numbers:
-                                        # Do not correct numbers
-                                        continue
-                                    else:
-                                        if int(count) > max_count:
-                                            # corrected_word = word.replace(key, candidate)
-                                            # print(key, candidate, corrected_word)
-                                            corrected_word = replaced
-                                            continue_loop = 0
-                                            max_count = int(count)
-                                elif replaced in self.rbm.long_vocabulary \
-                                        or replaced.lower() in self.rbm.long_vocabulary:
-                                    # If replaced word not in small vocabulary, look whether it's in long vocab
-                                    if key in self.numbers and candidate in self.numbers:
-                                        # Do not correct numbers
-                                        continue
-                                    else:
-                                        if int(count) > max_count:
-                                            # corrected_word = word.replace(key, candidate)
-                                            # print(key, candidate, corrected_word)
-                                            corrected_word = replaced
-                                            continue_loop = 0
-                                            max_count = int(count)
-                # Checked all rules, best substitution found
-                if continue_loop == 0:
-                    # the word is changed
-                    if word.startswith('*'):
-                        word = word.replace("*", "\*", 1)
-                    p1 = ' ' + word + ' '
-                    p2 = ' ' + word + '$'
-                    p3 = '^' + word + ' '
-                    # print(corrected_word)
-                    text = text.replace(p1, ' '+corrected_word+' ')
-                    text = re.sub(p2, ' '+corrected_word, text)
-                    text = re.sub(p3, corrected_word+' ', text)
-
-        return text
-
     def new_apply_char_rule(self, text):
         word_seq = nltk.word_tokenize(text)
         for word in word_seq:
             word = re.sub('^\W+$', '', word)
-            corrected_word = word
-            if word not in self.rbm.vocabulary and word.lower() not in self.rbm.vocabulary and word != ''\
-                    and word not in self.rbm.long_vocabulary and word.lower() not in self.rbm.long_vocabulary:
-                candidates = []
-                for key, target_ch_list in self.rbm.char_rules.items():
+            if word not in self.vocabulary and word.lower() not in self.vocabulary and word != ''\
+                    and word not in self.long_vocabulary and word.lower() not in self.long_vocabulary:
+                candidates = []  # list of (replaced word, word freq, rule freq)
+                for key, target_ch_list in self.char_rules.items():
                     # For rules correcting key
                     if key in self.chars:
                         # for all regular letters, find all occurrences in the word
@@ -208,153 +166,42 @@ class NoisyTextCorrection:
                         for target_ch, count in target_ch_list:
                             for i in range(n_subs):
                                 replaced = nth_repl(word, key, target_ch, i+1)  # replace n-th letter
-                                if replaced in self.rbm.vocabulary or replaced.lower() in self.rbm.vocabulary:
+                                if replaced in self.vocabulary or replaced.lower() in self.vocabulary:
                                     # Add replaced word and rule's count to candidates
-                                    if replaced in self.rbm.unigram:
-                                        candidates.append((replaced, count))
-
-
-
+                                    if replaced in self.unigram:
+                                        candidates.append((replaced, self.unigram[replaced], count))
+                                    elif replaced in self.long_vocabulary:
+                                        candidates.append((replaced, 1, count))
+                if len(candidates) <= 0 or len(word) <= 1:
+                    continue
+                else:
+                    candidates = sorted(candidates, key=itemgetter(2), reverse=True)
+                    candidates = sorted(candidates, key=itemgetter(1), reverse=True)
+                    if not candidates[0][0][0].isupper():
+                        corrected_word = candidates[0][0].lower()
+                    else:
+                        corrected_word = candidates[0][0]
+                    if word.startswith('*'):
+                        word = word.replace("*", "\*", 1)
+                    p1 = ' ' + word + ' '
+                    p2 = ' ' + word + '$'
+                    p3 = '^' + word + ' '
+                    # print(corrected_word)
+                    text = text.replace(p1, ' ' + corrected_word + ' ')
+                    text = re.sub(p2, ' ' + corrected_word, text)
+                    text = re.sub(p3, corrected_word + ' ', text)
 
 
         return text
+
     def process(self, text):
         # main method to process noisy text
 
         # Apply rules first
         text = self.remove_garbage_strings(text)
-        text = self.apply_char_rule(text)
+        text = self.new_apply_char_rule(text)
 
-        # Statistical approach
         return text
-
-
-class RuleBasedModel:
-    def __init__(self, ruleset_folder):
-        """
-        :param ruleset_folder: the folder name
-        """
-        self.ambiguous_pairs = {}
-        self.correction_rules = {}
-        self.fusing_rules = {}
-        self.hyphen_rules = {}
-        self.syncope_rules = {}
-        self.variant_spelling = {}
-        self.char_rules = {}
-        self.vocabulary = set()
-        self.long_vocabulary = set()
-        self.unigram = {}
-        self.place_names = []
-        self.personal_names = []
-        self.dis_bigrams = []
-
-        if ruleset_folder in os.listdir('.'):
-            self.path = './' + ruleset_folder
-        elif ruleset_folder in os.listdir('..'):
-            self.path = '../' + ruleset_folder
-        else:
-            print('Wrong rule set folder name!')
-            exit(0)
-        # self.read_all_rules_and_vocab()
-        self.read_char_rule_and_vocab()
-
-    def read_char_rule_and_vocab(self):
-        """
-        Read char rules and vocabularies in to rule-based model.
-        """
-        ruleset_list = ['CharRules.txt', 'vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt',
-                        'unigram.txt', 'words_long.txt']
-        for filename in ruleset_list:
-            file_path = os.path.join(self.path, filename)
-            ruleset = {}
-            voc = []
-            unigram_dict = {}
-            with open(file_path, 'r', encoding='utf-8') as r_f:
-                content = r_f.read()
-                rule_list = content.split('\n')
-                # If not vocabulary
-                if filename not in ['vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt',
-                                    'DisambigTwograms.txt', 'unigram.txt', 'words_long.txt']:
-                    for rule in rule_list:
-                        elements = rule.split(';')
-                        if int(elements[2]) > 10:
-                            if elements[1] in ruleset:
-                                ruleset[elements[1]] = ruleset[elements[1]] + [(elements[0], elements[2])]
-                            else:
-                                ruleset[elements[1]] = [(elements[0], elements[2])]  # Store rule using dictionary
-                    self.char_rules = ruleset
-                else:
-                    # Read vocabulary
-                    for word in rule_list:
-                        if filename == 'DisambigTwograms.txt':
-                            voc.append(word.strip('\n').split('\t')[0])
-                        elif filename == 'unigram.txt':
-                            unigram, count = word.strip('\n').split(' ')[0].lower(), int(word.strip('\n').split(' ')[1])
-                            unigram_dict[unigram] = count
-                            voc.append(unigram)
-                        else:
-                            voc.append(word.strip('\n').split(' ')[0].lower())
-                    # if filename == 'vocabulary.txt':
-                    if filename == 'unigram.txt':
-                        self.vocabulary = set(voc)
-                        self.unigram = unigram_dict
-                    elif filename == 'vocabulary.txt':
-                        self.long_vocabulary = self.long_vocabulary.union(set(voc))
-                    # elif filename == 'words_long.txt':
-                    #     self.long_vocabulary = self.long_vocabulary.union(set(voc))
-                    elif filename == 'PlaceNames.txt':
-                        self.place_names = set(voc)
-                    elif filename == 'PersonalNames.txt':
-                        self.personal_names = set(voc)
-                    elif filename == 'DisambigTwograms.txt':
-                        self.dis_bigrams = set(voc)
-
-    def read_all_rules_and_vocab(self):
-        """
-        Read all rules and vocabularies in to rule-based model.
-        """
-        ruleset_list = ['AmbiguousPairs.txt', 'CorrectionRules.txt', 'DisambigTwograms.txt', 'FusingRules.txt',
-                        'HyphenRules.txt', 'SyncopeRules.txt', 'VariantSpellings.txt', 'vocabulary.txt',
-                        'PlaceNames.txt', 'PersonalNames.txt']
-        for filename in ruleset_list:
-            file_path = os.path.join(self.path, filename)
-            ruleset = {}
-            voc = []
-            with open(file_path, 'r', encoding='utf-8') as r_f:
-                content = r_f.read()
-                rule_list = content.split('\n')
-                # If not vocabulary
-                if filename not in ['vocabulary.txt', 'PlaceNames.txt', 'PersonalNames.txt', 'DisambigTwograms.txt']:
-                    for rule in rule_list:
-                        elements = rule.split('\t')
-                        ruleset[elements[0]] = elements[1]  # Store rule using dictionary
-                    if filename == 'AmbiguousPairs.txt':
-                        self.ambiguous_pairs = ruleset
-                    elif filename == 'CorrectionRules.txt':
-                        self.correction_rules = ruleset
-                    elif filename == 'FusingRules.txt':
-                        self.fusing_rules = ruleset
-                    elif filename == 'HyphenRules.txt':
-                        self.hyphen_rules = ruleset
-                    elif filename == 'SyncopeRules.txt':
-                        self.syncope_rules = ruleset
-                    elif filename == 'VariantSpellings.txt':
-                        self.variant_spelling = ruleset
-                else:
-                    # Read vocabulary
-                    for word in rule_list:
-                        if filename == 'DisambigTwograms.txt':
-                            voc.append(word.strip('\n').split('\t')[0])
-                        else:
-                            voc.append(word.strip('\n'))
-                    if filename == 'vocabulary.txt':
-                        self.vocabulary = voc
-                    elif filename == 'PlaceNames.txt':
-                        self.place_names = voc
-                    elif filename == 'PersonalNames.txt':
-                        self.personal_names = voc
-                    elif filename == 'DisambigTwograms.txt':
-                        self.dis_bigrams = voc
 
 
 # Test script

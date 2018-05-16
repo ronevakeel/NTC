@@ -26,10 +26,9 @@ if __name__ == "__main__":
     # Rule-based system
     print('Rule-based ...')
     rbm = ntc.RuleBasedModel('ruleset')
-    model = ntc.NoisyTextCorrection(rbm)
     result = []
     for line in data:
-        result.append(model.process(line))
+        result.append(rbm.process(line))
 
     # Statistical system
     print("Statistical ...")
