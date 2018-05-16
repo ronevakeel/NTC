@@ -10,6 +10,23 @@ import operator
 import re
 
 
+def get_all_files(file_index=[]):
+    raw_text_directory = "../data/OCR_text/"
+    gold_standard_directory = "../data/gold_standard/"
+    raw_file_path = []
+    gold_file_path = []
+    if len(file_index) != 0:
+        for index in file_index:
+            if index > 27 or index < 0:
+                continue
+            raw_file_path.append(raw_text_directory + "NMB_" + str(index) + ".txt")
+            gold_file_path.append(gold_standard_directory + "ESF_" + str(index) + ".txt")
+    else:
+        for index in range(28):
+            raw_file_path.append(raw_text_directory + "NMB_" + str(index) + ".txt")
+            gold_file_path.append(gold_standard_directory + "ESF_" + str(index) + ".txt")
+    return raw_file_path, gold_file_path
+
 
 def read_file(filename):
     """

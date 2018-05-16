@@ -9,7 +9,7 @@ TOKENIZER = 1
 
 class ngram_model:
 
-    def __init__(self, unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold):
+    def __init__(self, unigram, bigram, total_tokens, len_unigram_dict, split_strategy, topN, delta, threshold, NE_list={}):
         """
         :param unigram: a dictionary of unigrams in the training corpus
         :param bigram: a dictionary of bigrams in the training corpus
@@ -19,6 +19,7 @@ class ngram_model:
         :param topN: the number of candidates for each word waiting to be corrected
         :param delta: the value of delta used to smooth the probability
         :param threshold: the threshold for the cost of candidate selection
+        :param NE_list: possible name entity in the raw data
         """
         self.unigram = unigram
         self.bigram = bigram
@@ -28,6 +29,7 @@ class ngram_model:
         self.topN = topN
         self.delta = delta
         self.threshold = threshold
+        self.NE_list = NE_list
 
 
 def readfile(file_name):
@@ -225,6 +227,25 @@ def read_sentence_file(file_path):
         sentence = line.split("\t")[1]
         content.append(sentence)
     return content
+
+
+def get_possible_NE_list(file_list):
+    import src.file_io as reader
+    NE_dict = {}
+    for file in file_list:
+        data = reader.read_file(file)
+        data = reader.clean_empty_line(data)
+        tokens = nltk.tokenize.word_tokenize(data)
+        token_pos_list = nltk.pos_tag(tokens)
+        for pair in token_pos_list:
+            word = pair[0]
+            pos = pair[1]
+            if pos.startswith("N") and word[0].isupper():
+                if word not in NE_dict:
+                    NE_dict[word] = 1
+                else:
+                    NE_dict[word] += 1
+    return NE_dict
 
 
 def wf_levenshtein(string_1, string_2):
