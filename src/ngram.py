@@ -39,9 +39,9 @@ def writefile(unigram, bigram, path):
     bi_file = open(os.path.join(path, "bigram"), 'w')
 
     for item, value in unigram.items():
-        uni_file.write(item + " " + str(value) + "\n")
+        uni_file.write(item + "\t" + str(value) + "\n")
     for item, value in bigram.items():
-        bi_file.write(item[0] + " " + item[1] + " " + str(value) + "\n")
+        bi_file.write(item[0] + "\t" + item[1] + "\t" + str(value) + "\n")
 
 
 def get_files(dir, file_list):
@@ -105,6 +105,40 @@ def splitstr(line, split_strategy):
     return items
 
 
+def read_ngram_model(model_path):
+    unigram_path = os.path.join(model_path, "unigram")
+    bigram_path = os.path.join(model_path, "bigram")
+    unigram = read_unigram_file(unigram_path)
+    bigram = read_bigram_file(bigram_path)
+    total_tokens = sum(unigram.values())
+    return unigram, bigram, total_tokens
+
+
+def read_unigram_file(file_path):
+    unigram = {}
+    lines = open(file_path, 'r').readlines()
+    for line in lines:
+        line = line.strip()
+        if re.match("\\s+", line):
+            continue
+        strs = line.split("\t")
+        unigram[strs[0]] = int(strs[1])
+    return unigram
+
+
+def read_bigram_file(file_path):
+    bigram = {}
+    lines = open(file_path, 'r').readlines()
+    for line in lines:
+        line = line.strip()
+        if re.match("\\s+", line):
+            continue
+        strs = line.split("\t")
+        bg = (strs[0], strs[1])
+        bigram[bg] = int(strs[2])
+    return bigram
+
+
 def ngrammodel(data_path, output_path):
     '''
     Given a data directory and output directory, generate files that store the count of unigrams and bigrams
@@ -139,9 +173,7 @@ def read_modern_corpus(data_path, unigram, bigram):
     for f in files:
         if operator.eq(f, ".DS_Store"):
             continue
-        path = os.path.join(data_path, f)
-        files = os.listdir(path)
-        sentence_file_path = os.path.join(path, f)
+        sentence_file_path = os.path.join(data_path, f)
         content = read_sentence_file(sentence_file_path)
         count_appearance(content, unigram, bigram, TOKENIZER)
 
@@ -214,7 +246,7 @@ def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN,
     words = splitstr(input_line, split_strategy)
     line_candidate = []
     for word in words:
-        if word in unigram:
+        if not need_modify(word, unigram):
             line_candidate.append([(word, 1)])
         else:
             candidates = get_candidate(word, unigram, topN, threshold)
@@ -222,6 +254,22 @@ def modify_line(unigram, bigram, input_line, total_tokens, split_strategy, topN,
     corrected_words = bestoutput(unigram, bigram, line_candidate, total_tokens, delta)
 
     return replace_words(input_line, words, corrected_words)
+
+
+def need_modify(err_word, unigram):
+    if err_word in unigram:
+        return False
+    pos = nltk.pos_tag([err_word])[0][1]
+    if operator.eq(pos, "NNS"):
+        if err_word.endswith("es"):
+            new_err_word = err_word[0:-2]
+            if new_err_word in unigram:
+                return False
+        if err_word.endswith("s"):
+            new_err_word = err_word[0:-1]
+            if new_err_word in unigram:
+                return False
+    return True
 
 
 def bestoutput(unigram, bigram, line_candidates, total_tokens, delta):
@@ -353,6 +401,7 @@ def get_bigram_prob(bigram_cand, unigram_dict, bigram_dict, delta, total_tokens)
     else:
         total += total_tokens
     return float(cw) / (total * bigram_cost[1])
+    # return float(cw)
 
 
 def get_candidate(err_word, unigram_dic, topN, threshold):

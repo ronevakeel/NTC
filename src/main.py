@@ -34,7 +34,7 @@ if __name__ == "__main__":
     # Statistical system
     print("Statistical ...")
     # unigram, bigram, total_tokens = ng.ngrammodel(n_gram_data_path, output_path)
-    unigram, bigram, total_tokens = ng.ngrammodel(data_path, output_path)
+    unigram, bigram, total_tokens = ng.read_ngram_model(output_path)
     new_result = []
     for line in result:
         if not re.match("\\s+", line):
