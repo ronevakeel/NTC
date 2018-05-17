@@ -64,9 +64,9 @@ if __name__ == "__main__":
 
     # Write result
     print('Writing result ...')
-    reader.write_file(result, output_path+'corrected_text1')
-    reader.write_file(new_result, output_path+'corrected_text2')
-    # reader.write_file(new_result, output_filename)
+    # reader.write_file(result, output_path+'corrected_text1')
+    # reader.write_file(new_result, output_path+'corrected_text2')
+    reader.write_file(new_result, output_filename)
 
     # Evaluation
     if len(sys.argv) == 4 or use_local_file is True:
